@@ -1,6 +1,6 @@
 {
   "name": "ai_final_project",
-  "private": true, 
+  "private": true,
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -23,5 +23,8 @@
   "bugs": {
     "url": "https://github.com/yiying10/AI_final_project/issues"
   },
-  "homepage": "https://github.com/yiying10/AI_final_project#readme"
+  "homepage": "https://github.com/yiying10/AI_final_project#readme",
+  "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.10.0"
+  }
 }
