@@ -17,40 +17,123 @@ interface Player {
 interface ChatRoomProps {
   roomId: string;
   playerId: string;
+  onPlayersChange: (players: Player[]) => void;
 }
 
-export default function ChatRoom({ roomId, playerId }: ChatRoomProps) {
+export default function ChatRoom({ roomId, playerId, onPlayersChange }: ChatRoomProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [selectedReceiverId, setSelectedReceiverId] = useState<string | null>('system');
   const [newMessage, setNewMessage] = useState('');
 
-  // 載入玩家
+  // 載入玩家並設置實時更新
   useEffect(() => {
+    // 初始載入玩家列表
     async function fetchPlayers() {
       const { data } = await supabase
         .from('players')
         .select('id, nickname')
         .eq('room_id', roomId);
-      if (data) setPlayers(data);
+      
+      if (data) {
+        console.log('載入的玩家列表：', data);
+        setPlayers(data);
+        onPlayersChange(data);
+      }
     }
+
     fetchPlayers();
 
+    // 建立實時訂閱 - 確保訂閱所有事件類型
     const playerChannel = supabase
-      .channel(`room-${roomId}-players`)
+      .channel(`room-${roomId}-players-realtime`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` },
-        () => {
-          fetchPlayers();
+        { 
+          event: '*',  // 監聽所有事件類型
+          schema: 'public', 
+          table: 'players', 
+          filter: `room_id=eq.${roomId}`
+        },
+        async (payload) => {
+          console.log('玩家變更事件：', payload);
+          
+          // 重新獲取最新的玩家列表
+          const { data: updatedPlayers } = await supabase
+            .from('players')
+            .select('id, nickname')
+            .eq('room_id', roomId);
+          
+          if (updatedPlayers) {
+            console.log('更新後的玩家列表：', updatedPlayers);
+            setPlayers(updatedPlayers);
+            onPlayersChange(updatedPlayers);
+            
+            // 處理玩家加入/離開消息
+            if (payload.eventType === 'INSERT') {
+              const newPlayer = payload.new as Player;
+              // 發送系統消息
+              await supabase.from('messages').insert([
+                {
+                  room_id: roomId,
+                  sender_id: 'system',
+                  receiver_id: 'system',
+                  content: `${newPlayer.nickname} 加入了房間`,
+                },
+              ]);
+            } 
+            else if (payload.eventType === 'DELETE') {
+              const oldPlayer = payload.old as Player;
+              if (oldPlayer && oldPlayer.nickname) {
+                // 發送系統消息
+                await supabase.from('messages').insert([
+                  {
+                    room_id: roomId,
+                    sender_id: 'system',
+                    receiver_id: 'system',
+                    content: `${oldPlayer.nickname} 離開了房間`,
+                  },
+                ]);
+              }
+            }
+          }
         }
       )
       .subscribe();
 
+    console.log('已設置玩家列表實時訂閱');
+
+    // 清理訂閱
     return () => {
-      supabase.removeChannel(playerChannel);
+      console.log('清理玩家列表實時訂閱');
+      playerChannel.unsubscribe();
     };
-  }, [roomId]);
+  }, [roomId, onPlayersChange]);
+
+  // 處理頁面離開事件
+  useEffect(() => {
+    // 添加頁面離開處理器
+    const handleBeforeUnload = () => {
+      // 使用 sendBeacon 發送同步請求
+      const data = JSON.stringify({ playerId, roomId });
+      navigator.sendBeacon('/api/leave-room', data);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // 組件卸載時清理
+    return () => {
+      console.log('組件卸載，執行離開操作');
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      // 組件卸載時也刪除玩家（如導航到其他頁面）
+      fetch('/api/leave-room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId, roomId }),
+      }).catch(err => console.error('離開房間時出錯：', err));
+    };
+  }, [playerId, roomId]);
 
   // 載入與訂閱訊息
   useEffect(() => {
@@ -60,6 +143,7 @@ export default function ChatRoom({ roomId, playerId }: ChatRoomProps) {
         .select('*')
         .eq('room_id', roomId)
         .order('created_at');
+      
       if (data) setAllMessages(data);
     }
 
@@ -78,7 +162,7 @@ export default function ChatRoom({ roomId, playerId }: ChatRoomProps) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(messageChannel);
+      messageChannel.unsubscribe();
     };
   }, [roomId]);
 
@@ -94,6 +178,9 @@ export default function ChatRoom({ roomId, playerId }: ChatRoomProps) {
   async function sendMessage() {
     const trimmed = newMessage.trim();
     if (!trimmed) return;
+
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const nickname = `玩家${randomSuffix}`;
 
     await supabase.from('messages').insert([
       {
@@ -146,16 +233,22 @@ export default function ChatRoom({ roomId, playerId }: ChatRoomProps) {
       <div className="flex flex-col flex-1">
         <div className="bg-white p-3 border-b">聊天室：{receiverName}</div>
         <div className="flex-1 p-3 overflow-y-auto space-y-2">
-          {filteredMessages.map((m) => (
-            <div
-              key={m.id}
-              className={`p-2 rounded max-w-[70%] ${
-                m.sender_id === playerId ? 'bg-blue-200 self-end ml-auto' : 'bg-gray-200'
-              }`}
-            >
-              {m.content}
-            </div>
-          ))}
+          {filteredMessages.map((m) => {
+            const sender = players.find((p) => p.id === m.sender_id);
+            return (
+              <div
+                key={m.id}
+                className={`p-2 rounded max-w-[70%] ${
+                  m.sender_id === playerId ? 'bg-blue-200 self-end ml-auto' : 'bg-gray-200'
+                }`}
+              >
+                <div className="text-xs text-gray-500 mb-1">
+                  {sender ? sender.nickname : (m.sender_id === playerId ? '你' : '未知')}
+                </div>
+                {m.content}
+              </div>
+            );
+          })}
         </div>
         <div className="p-3 border-t flex gap-2">
           <input
