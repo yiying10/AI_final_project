@@ -1,18 +1,19 @@
+'use client';
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { GameScript } from '@/lib/storyGenerator';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface GameContentProps {
   roomId: string;
   playerId: string;
   playerRole: string;
-  gameScript: GameScript;
+  gameScript: any;
 }
 
 interface RoomUpdate {
-  current_phase: string;
-  [key: string]: any;
+  id: string;
+  status: string;
 }
 
 export default function GameContent({
@@ -36,17 +37,17 @@ export default function GameContent({
     // 訂閱房間狀態變化
     const roomSubscription = supabase
       .channel(`room:${roomId}`)
-      .on<RoomUpdate>(
+      .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'rooms',
           filter: `id=eq.${roomId}`,
         },
-        (payload: RealtimePostgresChangesPayload<RoomUpdate>) => {
-          if (payload.new && payload.new.current_phase) {
-            setCurrentPhase(payload.new.current_phase);
+        (payload) => {
+          if (payload.new && payload.new.status) {
+            setCurrentPhase(payload.new.status);
           }
         }
       )
@@ -83,87 +84,116 @@ export default function GameContent({
     }
   };
 
-  // 渲染當前階段的內容
+  // 根據當前階段顯示不同內容
   const renderPhaseContent = () => {
     switch (currentPhase) {
       case 'introduction':
         return (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">故事背景</h3>
-            <p className="text-gray-700">{gameScript.background}</p>
-            <div className="bg-gray-100 p-4 rounded-lg">
-              <h4 className="font-bold">你的角色信息</h4>
-              {playerInfo && (
-                <>
-                  <p>角色：{playerInfo.name} ({playerInfo.role})</p>
-                  <p>公開信息：{playerInfo.public_info}</p>
-                  <p className="text-red-600">秘密：{playerInfo.secret}</p>
-                  <p className="text-blue-600">任務：{playerInfo.mission}</p>
-                </>
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <h3 className="text-xl font-bold mb-3">案件背景</h3>
+            <p className="mb-4">{gameScript.background}</p>
+            
+            {playerInfo && (
+              <div className="mt-6">
+                <h4 className="font-semibold mb-2">你的角色：{playerInfo.name}</h4>
+                <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                  <p><span className="font-medium">公開信息：</span> {playerInfo.public_info}</p>
+                  
+                  {playerInfo.secret && (
+                    <p className="mt-2"><span className="font-medium text-red-600">秘密：</span> {playerInfo.secret}</p>
+                  )}
+                  
+                  {playerInfo.mission && (
+                    <p className="mt-2"><span className="font-medium text-green-600">任務：</span> {playerInfo.mission}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <div className="mt-6">
+              <h4 className="font-semibold mb-2">遊戲流程</h4>
+              <ol className="list-decimal pl-5 space-y-1">
+                {gameScript.flow.map((step: string, index: number) => (
+                  <li key={index}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        );
+        
+      case 'investigation':
+        return (
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <h3 className="text-xl font-bold mb-3">調查階段</h3>
+            <p className="mb-4">尋找線索，調查案發現場。</p>
+            
+            <div className="flex justify-between items-center mb-4">
+              <div>剩餘時間：{Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, '0')}</div>
+            </div>
+            
+            <div className="mt-4">
+              <h4 className="font-semibold mb-2">發現的線索</h4>
+              {discoveredClues.length > 0 ? (
+                <ul className="list-disc pl-5">
+                  {discoveredClues.map((clue, index) => (
+                    <li key={index} className="mb-1">{clue}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-gray-500">尚未發現任何線索</p>
               )}
             </div>
           </div>
         );
-
-      case 'investigation':
-        return (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">調查階段</h3>
-            <p>剩餘時間：{Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, '0')}</p>
-            <div className="grid grid-cols-2 gap-4">
-              {gameScript.clues.map((clue, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleDiscoverClue(clue)}
-                  className={`p-4 border rounded ${
-                    discoveredClues.includes(clue)
-                      ? 'bg-green-100 border-green-500'
-                      : 'bg-white hover:bg-gray-50'
-                  }`}
-                >
-                  {discoveredClues.includes(clue) ? clue : '???'}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
+        
       case 'discussion':
         return (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">討論階段</h3>
-            <p>剩餘時間：{Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, '0')}</p>
-            <div className="bg-gray-100 p-4 rounded-lg">
-              <h4 className="font-bold">已發現的線索</h4>
-              <ul className="list-disc pl-5">
-                {discoveredClues.map((clue, index) => (
-                  <li key={index}>{clue}</li>
-                ))}
-              </ul>
-            </div>
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <h3 className="text-xl font-bold mb-3">討論階段</h3>
+            <p>與其他玩家討論案件，分享線索，找出兇手。</p>
+            
+            {playerInfo && playerInfo.role === 'murderer' && (
+              <div className="mt-4 bg-red-50 p-3 rounded border border-red-200">
+                <p className="font-medium text-red-700">你是兇手！請隱藏自己的身份，混淆視聽。</p>
+              </div>
+            )}
+            
+            {playerInfo && playerInfo.role === 'detective' && (
+              <div className="mt-4 bg-blue-50 p-3 rounded border border-blue-200">
+                <p className="font-medium text-blue-700">你是偵探！仔細分析線索，找出兇手。</p>
+              </div>
+            )}
           </div>
         );
-
+        
       case 'voting':
         return (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">投票階段</h3>
-            <p>請選擇你認為的兇手...</p>
-            {/* 投票界面將在後續實現 */}
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <h3 className="text-xl font-bold mb-3">投票階段</h3>
+            <p>根據討論結果，投票選出你認為的兇手。</p>
           </div>
         );
-
+        
+      case 'ended':
+        return (
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <h3 className="text-xl font-bold mb-3">遊戲結束</h3>
+            <p>遊戲已結束，感謝參與！</p>
+          </div>
+        );
+        
       default:
-        return <div>等待遊戲開始...</div>;
+        return (
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <h3 className="text-xl font-bold mb-3">等待中</h3>
+            <p>等待遊戲開始...</p>
+          </div>
+        );
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold">{gameScript.title}</h2>
-        <p className="text-gray-600">{gameScript.scene}</p>
-      </div>
+    <div className="my-6">
       {renderPhaseContent()}
     </div>
   );

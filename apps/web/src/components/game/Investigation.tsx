@@ -34,8 +34,8 @@ export default function Investigation({
     await supabase.from('messages').insert([
       {
         room_id: roomId,
-        sender_id: 'system',
-        receiver_id: 'system',
+        sender_id: playerId,
+        receiver_id: null,
         content: `${playerName} 移動到了 ${locationId}`,
       },
     ]);
@@ -57,8 +57,8 @@ export default function Investigation({
     await supabase.from('messages').insert([
       {
         room_id: roomId,
-        sender_id: 'system',
-        receiver_id: 'system',
+        sender_id: playerId,
+        receiver_id: null,
         content: `${playerName} 發現了新的證物！`,
       },
     ]);

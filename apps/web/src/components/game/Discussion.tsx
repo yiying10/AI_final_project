@@ -55,7 +55,7 @@ export default function Discussion({
       .subscribe();
 
     return () => {
-      supabase.removeChannel(playerChannel);
+      playerChannel.unsubscribe();
     };
   }, [roomId]);
 
@@ -77,8 +77,8 @@ export default function Discussion({
     await supabase.from('messages').insert([
       {
         room_id: roomId,
-        sender_id: 'system',
-        receiver_id: 'system',
+        sender_id: playerId,
+        receiver_id: null,
         content: `有人投了票！`,
       },
     ]);

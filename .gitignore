@@ -2,3 +2,4 @@
 .vercel/
 node_modules/
 .turbo/
+.env.local

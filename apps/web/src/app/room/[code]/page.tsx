@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { generateStory, validateAction } from '@/lib/storyGenerator';
 import ChatRoom from '@/components/ChatRoom';
@@ -26,7 +26,6 @@ interface Player {
   id: string;
   nickname: string;
   role: string;
-  is_ready: boolean;
 }
 
 interface Evidence {
@@ -99,17 +98,17 @@ interface Story {
 
 export default function RoomPage() {
   const params = useParams();
+  const router = useRouter();
   const codeParam = params.code as string;
 
   const [room, setRoom] = useState<any>(null);
   const [player, setPlayer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [playerCount, setPlayerCount] = useState(0);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [gameStatus, setGameStatus] = useState<GameStatus>('waiting');
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [story, setStory] = useState<GameScript | null>(null);
   const [generatingStory, setGeneratingStory] = useState(false);
@@ -118,44 +117,267 @@ export default function RoomPage() {
   useEffect(() => {
     if (!codeParam) return;
 
+    // 從 localStorage 獲取玩家 ID
+    const savedPlayerId = localStorage.getItem(`player_id_${codeParam}`);
+    console.log('從 localStorage 獲取玩家 ID:', savedPlayerId);
+
     async function fetchRoomAndPlayer() {
       setLoading(true);
 
-      const { data: room, error: roomErr } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('code', codeParam)
-        .single();
+      try {
+        // 获取房间信息
+        const { data: room, error: roomErr } = await supabase
+          .from('rooms')
+          .select('*')
+          .eq('code', codeParam)
+          .single();
 
-      if (roomErr || !room) {
-        setError('找不到該房間');
-        setLoading(false);
-        return;
-      }
+        if (roomErr || !room) {
+          setError('找不到該房間');
+          setLoading(false);
+          return;
+        }
 
-      setRoom(room);
+        setRoom(room);
 
-      const userCode = localStorage.getItem('user_code');
-      const { data: player, error: playerErr } = await supabase
-        .from('players')
-        .select('*')
-        .eq('room_id', room.id)
-        .eq('nickname', userCode)
-        .single();
+        // 获取当前房间的所有玩家
+        const { data: allPlayers } = await supabase
+          .from('players')
+          .select('id, nickname, role, is_host')
+          .eq('room_id', room.id);
 
-      if (playerErr || !player) {
-        setError('找不到對應的玩家');
-        setPlayer(null);
-      } else {
-        setPlayer(player);
+        // 如果有保存的玩家ID，尋找對應玩家
+        if (savedPlayerId && allPlayers) {
+          const savedPlayer = allPlayers.find(p => p.id === savedPlayerId);
+          if (savedPlayer) {
+            console.log('找到已保存的玩家:', savedPlayer.nickname);
+            setPlayer(savedPlayer);
+            setPlayers(allPlayers);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // 如果找不到保存的玩家ID或對應玩家不存在，創建新玩家
+        console.log('找不到已保存的玩家，創建新玩家');
+        
+        // 获取昵称（优先使用自定义昵称，如果没有则使用随机编号）
+        const customNickname = localStorage.getItem('user_nickname');
+        
+        // 生成随机4位数字
+        const generateRandomNumber = () => {
+          return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        };
+
+        // 获取已使用的编号
+        const usedNumbers = allPlayers
+          ? allPlayers
+              .map(p => p.nickname.match(/玩家(\d{4})/)?.[1])
+              .filter(Boolean)
+          : [];
+
+        // 生成未使用的随机编号
+        let randomNumber;
+        do {
+          randomNumber = generateRandomNumber();
+        } while (usedNumbers.includes(randomNumber));
+
+        const defaultNickname = `玩家${randomNumber}`;
+        const finalNickname = customNickname || defaultNickname;
+        
+        // 创建新玩家（不需要提供id，数据库会自动生成）
+        const isHost = !allPlayers || allPlayers.length === 0;
+        console.log('準備創建新玩家，房間ID:', room.id, '暱稱:', finalNickname, '是否為房主:', isHost);
+        
+        try {
+          const { data: newPlayer, error: createErr } = await supabase
+            .from('players')
+            .insert([
+              {
+                room_id: room.id,
+                nickname: finalNickname,
+                is_host: isHost,
+                joined_at: new Date().toISOString()
+              }
+            ])
+            .select()
+            .single();
+
+          if (createErr) {
+            console.error('创建玩家失败，錯誤詳情:', createErr);
+            setError('創建玩家失敗: ' + createErr.message);
+            setLoading(false);
+            return;
+          }
+
+          if (!newPlayer) {
+            console.error('创建玩家失败: 未返回玩家數據');
+            setError('創建玩家失敗: 未返回玩家數據');
+            setLoading(false);
+            return;
+          }
+
+          console.log('成功创建新玩家:', newPlayer);
+          
+          // 保存玩家ID到localStorage
+          localStorage.setItem(`player_id_${codeParam}`, newPlayer.id);
+          localStorage.setItem(`player_created_${codeParam}`, 'true');
+
+          // 如果是房主，更新房间的创建者ID
+          if (isHost) {
+            const { error: updateRoomErr } = await supabase
+              .from('rooms')
+              .update({ creator_id: newPlayer.id })
+              .eq('id', room.id);
+
+            if (updateRoomErr) {
+              console.error('更新房间创建者失败:', updateRoomErr);
+            }
+          }
+
+          setPlayer(newPlayer);
+          setPlayers(allPlayers ? [...allPlayers, newPlayer] : [newPlayer]);
+        } catch (insertError) {
+          console.error('創建玩家時發生異常:', insertError);
+          setError('創建玩家時發生異常: ' + (insertError instanceof Error ? insertError.message : '未知錯誤'));
+          setLoading(false);
+          return;
+        }
+
         setError('');
+      } catch (error) {
+        console.error('加载房间和玩家信息失败:', error);
+        setError('加載失敗');
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     }
 
     fetchRoomAndPlayer();
-  }, [codeParam]);
+  }, [codeParam]); // 只依赖codeParam，避免重复执行
+
+  // 載入並訂閱玩家列表（channel API）
+  useEffect(() => {
+    if (!room) return;
+
+    async function loadPlayers() {
+      try {
+        const { data, error } = await supabase
+          .from('players')
+          .select('id, nickname, role, is_host')
+          .eq('room_id', room.id);
+          
+        if (error) {
+          console.error('加载玩家列表失败:', error);
+          return;
+        }
+        
+        if (data) {
+          // 确保当前玩家在列表中
+          const currentPlayerInList = player ? data.some(p => p.id === player.id) : false;
+          
+          const validPlayers = data.map(p => ({
+            id: p.id,
+            nickname: p.nickname,
+            role: p.role || '',
+            is_host: p.is_host
+          }));
+          
+          setPlayers(validPlayers);
+          console.log('更新玩家列表:', validPlayers.length);
+          
+          // 如果当前玩家不在列表中，可能是被删除了
+          if (player && !currentPlayerInList) {
+            console.log('当前玩家不在列表中，可能已被删除');
+            setError('你的玩家資料已被刪除，請返回主頁面重新加入房間');
+          }
+        }
+      } catch (err) {
+        console.error('加载玩家列表时出错:', err);
+      }
+    }
+
+    // 创建实时订阅
+    const playerChannel = supabase
+      .channel(`room-${room.id}-players`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'players',
+          filter: `room_id=eq.${room.id}`
+        },
+        (payload) => {
+          console.log('收到玩家变更:', payload);
+          loadPlayers(); // 任何玩家变更都更新列表
+        }
+      )
+      .subscribe((status) => {
+        console.log('订阅状态:', status);
+      });
+
+    // 初始加载
+    loadPlayers();
+
+    return () => {
+      playerChannel.unsubscribe();
+    };
+  }, [room, player]);
+
+  // 處理玩家離開房間 - 只在瀏覽器關閉時執行
+  useEffect(() => {
+    // 只在真正離開頁面時執行清理
+    const handleBeforeUnload = () => {
+      if (player && room) {
+        console.log('頁面即將關閉，發送離開請求:', player.id);
+        
+        // 使用同步請求確保在頁面卸載前發送
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/leave-room', false); // 同步請求
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({
+          playerId: player.id,
+          roomId: room.id,
+          isHost: player.is_host
+        }));
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // 不再自動刪除玩家，避免在頁面重新渲染時誤刪
+    };
+  }, [player, room]);
+
+  // 新增一個函數用於手動離開房間
+  const leaveRoom = async () => {
+    if (player && room) {
+      console.log('手動離開房間:', player.id);
+      
+      // 删除玩家记录
+      await supabase
+        .from('players')
+        .delete()
+        .eq('id', player.id);
+
+      // 如果房主离开，删除房间
+      if (player.is_host) {
+        // 刪除房間前，清除該房間相關的localStorage記錄
+        localStorage.removeItem(`player_id_${codeParam}`);
+        
+        await supabase
+          .from('rooms')
+          .delete()
+          .eq('id', room.id);
+      }
+      
+      // 導航回主頁
+      router.push('/');
+    }
+  };
 
   // 訂閱房間狀態變化
   useEffect(() => {
@@ -175,7 +397,7 @@ export default function RoomPage() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(roomChannel);
+      roomChannel.unsubscribe();
     };
   }, [room]);
 
@@ -213,47 +435,6 @@ export default function RoomPage() {
     setRoles(initialRoles);
   }, [room]);
 
-  // 訂閱角色選擇變化
-  useEffect(() => {
-    if (!room) return;
-
-    const roleChannel = supabase
-      .channel(`room-${room.id}-roles`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` },
-        async () => {
-          const { data: players } = await supabase
-            .from('players')
-            .select('id, nickname, role, is_ready')
-            .eq('room_id', room.id);
-
-          if (players) {
-            // 確保所有必需的字段都存在
-            const validPlayers = players.map(p => ({
-              id: p.id,
-              nickname: p.nickname,
-              role: p.role || '',
-              is_ready: p.is_ready || false
-            }));
-            setPlayers(validPlayers);
-            setRoles(prevRoles => 
-              prevRoles.map(role => ({
-                ...role,
-                selected: validPlayers.some(p => p.role === role.id),
-                selectedBy: validPlayers.find(p => p.role === role.id)?.nickname
-              }))
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(roleChannel);
-    };
-  }, [room]);
-
   // 生成劇本
   async function handleGenerateStory() {
     if (!room || !player.is_host) return;
@@ -286,8 +467,7 @@ export default function RoomPage() {
         .from('rooms')
         .update({ 
           script_id: newScript.id,
-          status: 'role_selection',
-          current_phase: 'introduction'
+          status: 'role_selection'
         })
         .eq('id', room.id);
 
@@ -303,8 +483,8 @@ export default function RoomPage() {
         .from('messages')
         .insert([{
           room_id: room.id,
-          sender_id: 'system',
-          receiver_id: 'system',
+          sender_id: player.id,
+          receiver_id: null,
           content: `劇本已生成：${newScript.title}\n${newScript.background}`,
         }]);
 
@@ -436,8 +616,8 @@ export default function RoomPage() {
     await supabase.from('messages').insert([
       {
         room_id: room.id,
-        sender_id: 'system',
-        receiver_id: 'system',
+        sender_id: player.id,
+        receiver_id: null,
         content: `${player.nickname} 選擇了角色。`,
       },
     ]);
@@ -454,9 +634,17 @@ export default function RoomPage() {
       <p>狀態：{room.status}</p>
       <div className="bg-gray-100 px-3 py-2 rounded mb-4">
         <p className="font-medium">
-          人數：{playerCount} / {room.max_players}
+          人數：{players.length} / {room.max_players}
         </p>
       </div>
+
+      {/* 離開房間按鈕 */}
+      <button
+        onClick={leaveRoom}
+        className="mb-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+      >
+        離開房間
+      </button>
 
       {/* 房主控制面板 */}
       {player.is_host && room.status === 'waiting' && (
@@ -464,12 +652,12 @@ export default function RoomPage() {
           <h3 className="text-lg font-semibold mb-2">房主控制面板</h3>
           <button
             onClick={handleGenerateStory}
-            disabled={generatingStory || playerCount < 4}
+            disabled={generatingStory || players.length < 4}
             className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
           >
             {generatingStory ? '生成劇本中...' : '開始遊戲'}
           </button>
-          {playerCount < 4 && (
+          {players.length < 4 && (
             <p className="text-sm text-red-600 mt-2">需要至少4名玩家才能開始遊戲</p>
           )}
         </div>
@@ -487,11 +675,7 @@ export default function RoomPage() {
 
       {/* 聊天室 */}
       <div className="mt-6 border rounded bg-white shadow">
-        <ChatRoom
-          roomId={room.id}
-          playerId={player.id}
-          onPlayersChange={(players) => setPlayerCount(players.length)}
-        />
+        <ChatRoom roomId={room.id} playerId={player.id} players={players} />
       </div>
 
       {gameStatus === 'investigation' && (
@@ -519,18 +703,4 @@ export default function RoomPage() {
       )}
     </main>
   );
-}
-
-function PlayerCount({ roomId }: { roomId: string }) {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    async function fetchCount() {
-      const { data } = await supabase.from('players').select('id').eq('room_id', roomId);
-      if (data) setCount(data.length);
-    }
-    fetchCount();
-  }, [roomId]);
-
-  return <>{count}</>;
 }
