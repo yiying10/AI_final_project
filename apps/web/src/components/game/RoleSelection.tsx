@@ -92,10 +92,19 @@ export default function RoleSelection({
 
   // 選擇角色
   async function selectRole(role: string) {
-    if (myRole || selectedRoles[role]) return;
+    if (myRole) return;
+    if (selectedRoles[role]) {
+      toast.error('此角色已被選擇');
+      return;
+    }
     
     setLoading(true);
     try {
+      const selectedCharacter = characters.find(c => c.role === role);
+      if (selectedCharacter) {
+        setMyRole(role); // 立即顯示角色詳細資訊
+      }
+
       const { error } = await supabase
         .from('players')
         .update({ role: role })
@@ -103,15 +112,13 @@ export default function RoleSelection({
 
       if (error) throw error;
 
-      setMyRole(role);
-      
       // 發送系統消息
       await supabase.from('messages').insert([
         {
           room_id: roomId,
           sender_id: 'system',
           receiver_id: 'system',
-          content: `${playerName} 選擇了角色 ${characters.find(c => c.role === role)?.name || role}`,
+          content: `${playerName} 選擇了角色 ${selectedCharacter?.name || role}`,
         },
       ]);
 
@@ -149,67 +156,77 @@ export default function RoleSelection({
 
   return (
     <div className="my-6">
-      <h3 className="text-xl font-bold mb-4">選擇你的角色</h3>
-      
-      {myRole ? (
+      {allPlayersReady ? (
         <div className="bg-green-50 border border-green-200 rounded p-4 mb-6">
           <p className="font-medium text-green-800">
-            你已選擇角色：{characters.find(c => c.role === myRole)?.name || myRole}
-          </p>
-          <p className="text-sm text-green-700 mt-2">
-            等待其他玩家選擇角色...
+            角色已選擇完成，請開始自我介紹。
           </p>
         </div>
       ) : (
-        <p className="text-gray-600 mb-4">請選擇一個角色：</p>
+        <>
+          <h3 className="text-xl font-bold mb-4">選擇你的角色</h3>
+          
+          {myRole ? (
+            <div className="bg-green-50 border border-green-200 rounded p-4 mb-6">
+              <p className="font-medium text-green-800">
+                你已選擇角色：{characters.find(c => c.role === myRole)?.name || myRole}
+              </p>
+              <p className="text-sm text-green-700 mt-2">
+                等待其他玩家選擇角色...
+              </p>
+            </div>
+          ) : (
+            <p className="text-gray-600 mb-4">請選擇一個角色：</p>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {characters.map((character) => {
+              const isSelected = !!selectedRoles[character.role];
+              const isMyRole = myRole === character.role;
+              
+              return (
+                <div
+                  key={character.role}
+                  className={`border rounded-lg p-4 transition-all ${
+                    isSelected
+                      ? isMyRole
+                        ? 'bg-blue-50 border-blue-300'
+                        : 'bg-gray-50 border-gray-200 opacity-70'
+                      : 'hover:border-blue-300 cursor-pointer'
+                  }`}
+                  onClick={() => !isSelected && !myRole && selectRole(character.role)}
+                >
+                  <div className="flex justify-between items-start">
+                    <h4 className="font-bold text-lg">{character.name}</h4>
+                    {isSelected && (
+                      <span className="text-xs bg-gray-200 px-2 py-1 rounded">
+                        {isMyRole ? '你的角色' : `${selectedRoles[character.role]} 已選擇`}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm mt-2">{character.public_info}</p>
+                  
+                  {isMyRole && character.secret && (
+                    <div className="mt-4 bg-yellow-50 border border-yellow-200 p-3 rounded">
+                      <p className="text-sm font-medium text-yellow-800">秘密信息：</p>
+                      <p className="text-sm mt-1">{character.secret}</p>
+                    </div>
+                  )}
+                  
+                  {isMyRole && character.mission && (
+                    <div className="mt-4 bg-blue-50 border border-blue-200 p-3 rounded">
+                      <p className="text-sm font-medium text-blue-800">任務：</p>
+                      <p className="text-sm mt-1">{character.mission}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {characters.map((character) => {
-          const isSelected = !!selectedRoles[character.role];
-          const isMyRole = myRole === character.role;
-          
-          return (
-            <div
-              key={character.role}
-              className={`border rounded-lg p-4 transition-all ${
-                isSelected
-                  ? isMyRole
-                    ? 'bg-blue-50 border-blue-300'
-                    : 'bg-gray-50 border-gray-200 opacity-70'
-                  : 'hover:border-blue-300 cursor-pointer'
-              }`}
-              onClick={() => !isSelected && !myRole && selectRole(character.role)}
-            >
-              <div className="flex justify-between items-start">
-                <h4 className="font-bold text-lg">{character.name}</h4>
-                {isSelected && (
-                  <span className="text-xs bg-gray-200 px-2 py-1 rounded">
-                    {isMyRole ? '你的角色' : `${selectedRoles[character.role]} 已選擇`}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm mt-2">{character.public_info}</p>
-              
-              {isMyRole && character.secret && (
-                <div className="mt-4 bg-yellow-50 border border-yellow-200 p-3 rounded">
-                  <p className="text-sm font-medium text-yellow-800">秘密信息：</p>
-                  <p className="text-sm mt-1">{character.secret}</p>
-                </div>
-              )}
-              
-              {isMyRole && character.mission && (
-                <div className="mt-4 bg-blue-50 border border-blue-200 p-3 rounded">
-                  <p className="text-sm font-medium text-blue-800">任務：</p>
-                  <p className="text-sm mt-1">{character.mission}</p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {isHost && (
+      {isHost && !allPlayersReady && (
         <div className="mt-6 border-t pt-4">
           <div className="flex justify-between items-center">
             <div>
@@ -232,4 +249,4 @@ export default function RoleSelection({
       )}
     </div>
   );
-} 
+}

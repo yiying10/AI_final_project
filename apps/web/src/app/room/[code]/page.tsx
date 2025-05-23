@@ -10,6 +10,8 @@ import Discussion from '@/components/game/Discussion';
 import { toast } from 'react-hot-toast';
 import GameContent from '@/components/game/GameContent';
 
+const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
+
 // 遊戲狀態
 type GameStatus = 'waiting' | 'selecting_roles' | 'introduction' | 'investigation' | 'discussion' | 'voting' | 'ended';
 
@@ -438,7 +440,7 @@ export default function RoomPage() {
   // 生成劇本
   async function handleGenerateStory() {
     if (!room || !player.is_host) return;
-    
+  
     setGeneratingStory(true);
     try {
       // 檢查是否已經有劇本
@@ -448,74 +450,61 @@ export default function RoomPage() {
           .select('*')
           .eq('id', room.script_id)
           .single();
-
+  
         if (!fetchError && existingScript) {
           setStory(existingScript);
+          setGameStatus('introduction'); // 更新前端狀態為 introduction
+          setRoom((prevRoom) => ({ ...prevRoom, status: 'introduction' })); // 更新本地 room 狀態
           toast.success('已載入現有劇本');
           return;
         }
       }
-
+  
       // 生成新劇本
       const newScript = await generateStory(room.id);
       if (!newScript) {
         throw new Error('生成劇本失敗：未返回劇本數據');
       }
-      
+  
       // 更新房間狀態
       const { error: roomError } = await supabase
         .from('rooms')
-        .update({ 
+        .update({
           script_id: newScript.id,
-          status: 'role_selection'
+          status: 'introduction', // 更新後端狀態為 introduction
         })
         .eq('id', room.id);
-
+  
       if (roomError) {
         throw new Error(`更新房間狀態失敗：${roomError.message}`);
       }
-
+  
       setStory(newScript);
-      setGameStatus('role_selection' as GameStatus);
-      
+      setGameStatus('introduction'); // 更新前端狀態為 introduction
+      setRoom((prevRoom) => ({ ...prevRoom, status: 'introduction' })); // 更新本地 room 狀態
+  
       // 發送系統訊息
       const { error: messageError } = await supabase
         .from('messages')
-        .insert([{
-          room_id: room.id,
-          sender_id: player.id,
-          receiver_id: null,
-          content: `劇本已生成：${newScript.title}\n${newScript.background}`,
-        }]);
-
+        .insert([
+          {
+            room_id: room.id,
+            sender_id: SYSTEM_USER_ID,
+            receiver_id: null,
+            content: `劇情大綱：${newScript.title}\n${newScript.background}`,
+          },
+        ]);
+  
       if (messageError) {
         console.error('發送系統訊息失敗：', messageError);
       }
-
+  
       toast.success('劇本生成成功！');
     } catch (error) {
       console.error('生成劇本失敗：', error);
       toast.error(error instanceof Error ? error.message : '生成劇本失敗，請重試');
     } finally {
       setGeneratingStory(false);
-    }
-  }
-
-  // 驗證玩家行為
-  async function handleValidateAction(action: string) {
-    if (!story || !player.role) return;
-    
-    try {
-      const result = await validateAction(story, action, player.role);
-      
-      if (!result.valid) {
-        toast.error(result.message);
-      }
-      
-      return result.valid;
-    } catch (error) {
-      console.error('驗證行為失敗：', error);
-      return true; // 如果驗證失敗，暫時允許行為
     }
   }
 
@@ -652,13 +641,13 @@ export default function RoomPage() {
           <h3 className="text-lg font-semibold mb-2">房主控制面板</h3>
           <button
             onClick={handleGenerateStory}
-            disabled={generatingStory || players.length < 4}
+            disabled={generatingStory || players.length < 1}
             className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
           >
             {generatingStory ? '生成劇本中...' : '開始遊戲'}
           </button>
-          {players.length < 4 && (
-            <p className="text-sm text-red-600 mt-2">需要至少4名玩家才能開始遊戲</p>
+          {players.length < 1 && (
+            <p className="text-sm text-red-600 mt-2">需要至少1名玩家才能開始遊戲</p>
           )}
         </div>
       )}
