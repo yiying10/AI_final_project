@@ -89,7 +89,8 @@ async def call_llm_for_generation(
     # A. 系統指令 + user prompt
     system = (
         "你是一個劇本殺世界設定生成器，"
-        "請按照 characters, locations, evidence 這三個欄位結構，"
+        "請按照 characters, locations, evidence ,npc,這4個結構"
+        "每個npc會有自己對應的location"
         "以純 JSON 回傳，所有文字請使用中文。"
     )
     user = f"主題：{theme}；風格：{tone}；"

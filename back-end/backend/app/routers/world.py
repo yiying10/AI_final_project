@@ -1,16 +1,20 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
-import json, os
+# back-end/backend/app/routers/world.py
+from fastapi import APIRouter, HTTPException
+import json, random
+from pathlib import Path
 
-router = APIRouter()
+router = APIRouter(prefix="", tags=["world"])
 
-class WorldRequest(BaseModel):
-    # 若未來要支援更多參數，可加在這裡；目前無需 body
-    pass
+DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "world.json"
+DATA = json.loads(DATA_PATH.read_text(encoding="utf-8"))
 
-@router.get("/", response_model=dict)
-async def get_world():
-    base = os.path.dirname(__file__)
-    path = os.path.normpath(os.path.join(base, '..', '..', 'data', 'world.json'))
-    with open(path, encoding='utf-8') as f:
-        return json.load(f)
+@router.get("/", summary="Get a random world")
+def get_world():
+    return random.choice(DATA)
+
+@router.get("/{world_id}", summary="Get world by ID")
+def get_world_by_id(world_id: int):
+    for w in DATA:
+        if w.get("id") == world_id:
+            return w
+    raise HTTPException(404, "World not found")
