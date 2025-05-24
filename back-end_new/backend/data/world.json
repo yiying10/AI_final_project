@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "characters": [],
+    "locations": [
+      "校園"
+    ],
+    "evidence": [],
+    "npc": []
+  },
+  {
+    "id": 2,
+    "characters": [
+      {
+        "name": "林曉",
+        "description": "文靜內向的圖書館管理員，暗戀著籃球隊長。",
+        "relationship": "暗戀者"
+      },
+      {
+        "name": "陳宇",
+        "description": "陽光開朗的籃球隊隊長，學校的風雲人物。",
+        "relationship": "被暗戀者"
+      },
+      {
+        "name": "李薇",
+        "description": "熱情大方的啦啦隊隊長，陳宇的女朋友。",
+        "relationship": "情侶"
+      },
+      {
+        "name": "張強",
+        "description": "成績優異的學生會主席，對李薇有好感。",
+        "relationship": "競爭者"
+      },
+      {
+        "name": "王美玲",
+        "description": "八卦的校園記者，喜歡挖掘各種內幕消息。",
+        "relationship": "旁觀者"
+      }
+    ],
+    "locations": [
+      {
+        "name": "圖書館",
+        "description": "林曉工作的地方，安靜且充滿書籍。",
+        "clues": "一本被夾在書中的情書，署名未知。"
+      },
+      {
+        "name": "籃球場",
+        "description": "陳宇揮灑汗水的地方，也是同學們聚集的場所。",
+        "clues": "一個刻有李薇名字的籃球。"
+      },
+      {
+        "name": "啦啦隊練習室",
+        "description": "李薇和啦啦隊員們練習的地方，充滿活力。",
+        "clues": "一張被撕毀的照片，上面有李薇和張強的合影。"
+      },
+      {
+        "name": "學生會辦公室",
+        "description": "張強處理學生事務的地方，整潔有序。",
+        "clues": "一份學生會贊助申請，申請人是林曉，但被張強駁回。"
+      },
+      {
+        "name": "學校後花園",
+        "description": "一個僻靜的角落，情侶們約會的場所。",
+        "clues": "一條斷了的項鍊，上面有一個籃球造型的吊墜。"
+      }
+    ],
+    "evidence": [
+      {
+        "name": "情書",
+        "description": "匿名情書，內容充滿愛意，收件人可能是陳宇。",
+        "location": "圖書館"
+      },
+      {
+        "name": "刻字籃球",
+        "description": "刻有李薇名字的籃球，可能是陳宇送的。",
+        "location": "籃球場"
+      },
+      {
+        "name": "撕毀的照片",
+        "description": "李薇和張強的合影，但被撕毀，原因不明。",
+        "location": "啦啦隊練習室"
+      },
+      {
+        "name": "學生會贊助申請",
+        "description": "林曉的申請被張強駁回，可能存在私人恩怨。",
+        "location": "學生會辦公室"
+      },
+      {
+        "name": "斷裂的項鍊",
+        "description": "籃球造型的項鍊，可能屬於林曉或李薇。",
+        "location": "學校後花園"
+      }
+    ],
+    "npc": [
+      {
+        "name": "宿管阿姨",
+        "description": "負責宿舍管理的阿姨，掌握學生們的作息時間。",
+        "information": "目擊到林曉經常在晚上去籃球場。"
+      },
+      {
+        "name": "籃球隊員",
+        "description": "陳宇的隊友，了解陳宇的感情狀況。",
+        "information": "透露陳宇和李薇最近經常吵架。"
+      },
+      {
+        "name": "啦啦隊員",
+        "description": "李薇的隊友，知道李薇的秘密。",
+        "information": "暗示李薇和張強之間可能存在曖昧關係。"
+      },
+      {
+        "name": "學生會幹事",
+        "description": "學生會成員，了解張強的為人。",
+        "information": "表示張強做事公私分明，但有時會顯得冷酷。"
+      },
+      {
+        "name": "食堂阿姨",
+        "description": "負責食堂的阿姨，觀察學生們的互動。",
+        "information": "看到林曉經常一個人吃飯，表情落寞。"
+      }
+    ]
+  }
+]
