@@ -17,12 +17,6 @@ export interface GameScript {
   summary: string;
   characters: Character[];
   clues: string[];
-  flow: string[];
-  victory_rules: {
-    murderer_win: string;
-    justice_win: string;
-    neutral_win: string;
-  };
 }
 
 const defaultScript: GameScript = {
@@ -81,14 +75,6 @@ const defaultScript: GameScript = {
     '起居室壁爐有信封殘骸',
     '書房中一只座鐘缺少發條鑰',
     '玻璃走廊有泥鞋印但窗戶封閉'
-  ],
-  flow: [
-    '開場介紹與公開線索',
-    '第一輪自由調查與對話',
-    '突發事件：鐘塔響起、停電反鎖',
-    '第二輪交叉盤問與個人任務觸發',
-    '第三輪提示與任務進度更新',
-    '最終投票與揭曉兇手'
   ],
   victory_rules: {
     murderer_win: '未被投出並誤導多數人',
@@ -174,14 +160,6 @@ export async function generateStory(roomId: string): Promise<GameScript> {
             '起居室壁爐有信封殘骸',
             '書房中一只座鐘缺少發條鑰',
             '玻璃走廊有泥鞋印但窗戶封閉'
-          ],
-          flow: [
-            '開場介紹與公開線索',
-            '第一輪自由調查與對話',
-            '突發事件：鐘塔響起、停電反鎖',
-            '第二輪交叉盤問與個人任務觸發',
-            '第三輪提示與任務進度更新',
-            '最終投票與揭曉兇手'
           ],
           victory_rules: {
             murderer_win: '未被投出並誤導多數人',
