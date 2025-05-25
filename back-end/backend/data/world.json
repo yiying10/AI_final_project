@@ -1,0 +1,117 @@
+[
+  {
+    "id": 1,
+    "characters": [
+      {
+        "id": "char01",
+        "name": "吳天翔",
+        "role": "古物修復師",
+        "public_info": "受聘於市立博物館修復珍貴文物",
+        "secret": "曾私下將一件稀世文物帶出館外",
+        "mission": "在館長發現前把那件文物偷偷換回原處"
+      }
+    ],
+    "locations": [
+      {
+        "id": "loc01",
+        "name": "博物館",
+        "description": "高挑展廳中央陳列一尊無價青銅像，四周玻璃櫃排列著書畫與陶瓷",
+        "npcs": ["char01"],
+        "evidence": []
+      }
+    ],
+    "evidence": []
+  },
+  {
+    "id":2,
+    "characters": [
+      {
+        "id": "char02",
+        "name": "林志華",
+        "role": "急診醫師",
+        "public_info": "夜班值守，處理各類緊急傷病",
+        "secret": "偷偷從急診室帶出病患名單賣給藥商",
+        "mission": "在院長查書記錄前抹去自己的簽名"
+      }
+    ],
+    "locations": [
+      {
+        "id": "loc02",
+        "name": "醫院急診室",
+        "description": "白色牆面泛著冷光，推床、輸液架和監護儀器緊密排列",
+        "npcs": ["char02"],
+        "evidence": []
+      }
+    ],
+    "evidence": []
+  },
+  {
+    "id":3,
+    "characters": [
+      {
+        "id": "char03",
+        "name": "張雅婷",
+        "role": "國文教師",
+        "public_info": "資深導師，負責班級德育工作",
+        "secret": "私下給成績下滑的學生賄賂以換取安靜",
+        "mission": "在校長查畢業榜單前秘密調整成績"
+      }
+    ],
+    "locations": [
+      {
+        "id": "loc03",
+        "name": "學校教室",
+        "description": "課桌整齊排成幾列，黑板上寫著今日課程大綱，教室窗台擺有多盆綠植",
+        "npcs": ["char03"],
+        "evidence": []
+      }
+    ],
+    "evidence": []
+  },
+  {
+    "id":4,
+    "characters": [
+      {
+        "id": "char04",
+        "name": "安娜·馮貝克",
+        "role": "城堡管家",
+        "public_info": "世襲管家，謹守祖訓管理古堡",
+        "secret": "暗中與對頭家族勾結出賣城堡機密",
+        "mission": "在領主回來前銷毀往來書信"
+      }
+    ],
+    "locations": [
+      {
+        "id": "loc04",
+        "name": "古堡大廳",
+        "description": "石柱支撐拱形天花板，牆上掛滿先祖油畫與家徽旗幟",
+        "npcs": ["char04"],
+        "evidence": []
+      }
+    ],
+    "evidence": []
+  },
+  {
+    "id":5,
+    "characters": [
+      {
+        "id": "char05",
+        "name": "陳家瑜",
+        "role": "公寓住戶",
+        "public_info": "自由作家，經常深夜熬稿",
+        "secret": "在鄰居家安裝竊聽器收集隱私消息",
+        "mission": "將錄音檔偷換成空白再放回原處"
+      }
+    ],
+    "locations": [
+      {
+        "id": "loc05",
+        "name": "市中心公寓",
+        "description": "狹小走廊兩側佈滿信箱，住戶門口門牌與門鈴排列緊密",
+        "npcs": ["char05"],
+        "evidence": []
+      }
+    ],
+    "evidence": []
+  }
+]

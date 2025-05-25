@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+python-dotenv
+#openai
+google-genai
+pytest
+httpx
+jsonschema
+pytest-asyncio
