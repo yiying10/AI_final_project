@@ -1,6 +1,0 @@
-fastapi[all]
-uvicorn
-pydantic
-python-dotenv
-google-genai
-redis
