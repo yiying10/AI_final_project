@@ -18,23 +18,32 @@ interface ChatRoomProps {
   roomId: string;
   playerId: string;
   players: Player[];
+  setPlayers: React.Dispatch<React.SetStateAction<Player[]>>;
 }
 
-export default function ChatRoom({ roomId, playerId, players }: ChatRoomProps) {
+export default function ChatRoom({ roomId, playerId, players, setPlayers }: ChatRoomProps) {
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [selectedReceiverId, setSelectedReceiverId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
 
-  // 載入與訂閱訊息 (只負責消息)
+  // 初始載入訊息
   useEffect(() => {
+    let isMounted = true;
     async function fetchMessages() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('room_id', roomId)
         .order('created_at', { ascending: true });
-      
-      if (data) setAllMessages(data);
+
+      if (error) {
+        console.error('讀取訊息失敗:', error);
+        return;
+      }
+
+      if (isMounted && data) {
+        setAllMessages(data);
+      }
     }
 
     fetchMessages();
@@ -43,61 +52,96 @@ export default function ChatRoom({ roomId, playerId, players }: ChatRoomProps) {
       .channel(`room-${roomId}-messages`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `room_id=eq.${roomId}`,
+        },
         (payload) => {
           const msg = payload.new as Message;
-          setAllMessages((prev) => [...prev, msg]);
+          setAllMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
         }
       )
       .subscribe();
 
     return () => {
+      isMounted = false;
       messageChannel.unsubscribe();
     };
   }, [roomId]);
 
+  // 初始載入與訂閱玩家列表
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchPlayers() {
+      const { data, error } = await supabase
+        .from('players')
+        .select('id, nickname')
+        .eq('room_id', roomId);
+
+      if (error) {
+        console.error('獲取玩家列表失敗:', error);
+        return;
+      }
+
+      if (isMounted && data) {
+        setPlayers(data);
+      }
+    }
+
+    fetchPlayers();
+
+    const playerChannel = supabase
+      .channel(`room-${roomId}-players`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'players',
+          filter: `room_id=eq.${roomId}`,
+        },
+        () => fetchPlayers()
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      playerChannel.unsubscribe();
+    };
+  }, [roomId, setPlayers]);
+
   const filteredMessages = allMessages.filter((msg) => {
-    // 系統消息：接收者為 null
     if (selectedReceiverId === null) return msg.receiver_id === null;
-    // 私聊消息
     return (
       (msg.sender_id === playerId && msg.receiver_id === selectedReceiverId) ||
       (msg.receiver_id === playerId && msg.sender_id === selectedReceiverId)
     );
   });
 
-  // 發送訊息
   async function sendMessage() {
     const trimmed = newMessage.trim();
     if (!trimmed) return;
 
-    try {
-      console.log('發送訊息：', {
+    const { error } = await supabase.from('messages').insert([
+      {
         room_id: roomId,
         sender_id: playerId,
         receiver_id: selectedReceiverId,
-        content: trimmed
-      });
-      
-      const { data, error } = await supabase.from('messages').insert([
-        {
-          room_id: roomId,
-          sender_id: playerId,
-          receiver_id: selectedReceiverId,
-          content: trimmed,
-        },
-      ]).select();
-      
-      if (error) {
-        console.error('發送訊息失敗：', error);
-      } else {
-        console.log('訊息發送成功：', data);
-      }
-      
-      setNewMessage('');
-    } catch (err) {
-      console.error('發送訊息時出錯：', err);
+        content: trimmed,
+      },
+    ]);
+
+    if (error) {
+      console.error('發送訊息失敗：', error);
     }
+
+    setNewMessage('');
   }
 
   const receiverName =
@@ -105,7 +149,7 @@ export default function ChatRoom({ roomId, playerId, players }: ChatRoomProps) {
       ? '系統/所有人'
       : players.find((p) => p.id === selectedReceiverId)?.nickname || '私聊';
 
-  // 確保新消息時滾動到底部
+  // 訊息視窗自動捲到底
   useEffect(() => {
     const chatContainer = document.getElementById('chat-messages');
     if (chatContainer) {
@@ -115,11 +159,10 @@ export default function ChatRoom({ roomId, playerId, players }: ChatRoomProps) {
 
   return (
     <div className="flex h-[70vh] border rounded overflow-hidden">
-      {/* 左側玩家列表 */}
       <div className="w-40 border-r overflow-y-auto bg-gray-100">
         <div className="p-2 text-xs text-gray-500 border-b">房間人數: {players.length}</div>
         {[
-          { id: null, label: '系統/所有人' },
+          { id: null, label: '大廳' },
           ...players
             .filter((p) => p.id !== playerId)
             .map((p) => ({ id: p.id, label: p.nickname })),
@@ -127,7 +170,7 @@ export default function ChatRoom({ roomId, playerId, players }: ChatRoomProps) {
           const isActive =
             selectedReceiverId === entry.id ||
             (selectedReceiverId === null && entry.id === null);
-          
+
           return (
             <button
               key={entry.id ?? 'null'}
@@ -142,28 +185,27 @@ export default function ChatRoom({ roomId, playerId, players }: ChatRoomProps) {
         })}
       </div>
 
-      {/* 右側聊天區域 */}
       <div className="flex flex-col flex-1">
-        <div className="bg-white p-3 border-b">聊天室：{receiverName}</div>
+        <div className="bg-white p-3 border-b">{receiverName}</div>
         <div className="flex-1 p-3 overflow-y-auto space-y-2" id="chat-messages">
           {filteredMessages.map((m) => {
             const sender = players.find((p) => p.id === m.sender_id);
             const isSystemMessage = m.receiver_id === null;
-            
+
             return (
               <div
                 key={m.id}
                 className={`p-2 rounded max-w-[90%] ${
-                  isSystemMessage 
-                    ? 'bg-gray-100 text-center mx-auto text-gray-500 text-sm border border-gray-200' 
-                    : m.sender_id === playerId 
-                      ? 'bg-blue-200 self-end ml-auto' 
-                      : 'bg-gray-200'
+                  isSystemMessage
+                    ? 'bg-gray-100 text-center mx-auto text-gray-500 text-sm border border-gray-200'
+                    : m.sender_id === playerId
+                    ? 'bg-blue-200 self-end ml-auto'
+                    : 'bg-gray-200'
                 }`}
               >
                 {!isSystemMessage && (
                   <div className="text-xs text-gray-500 mb-1">
-                    {sender ? sender.nickname : (m.sender_id === playerId ? '你' : '未知')}
+                    {sender ? sender.nickname : m.sender_id === playerId ? '你' : '未知'}
                   </div>
                 )}
                 {m.content}

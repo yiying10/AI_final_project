@@ -179,6 +179,7 @@ export default function HomePage() {
   async function joinRoom() {
     if (!joinCode) {
       toast.error('請輸入房間代碼');
+      alert('請輸入房間代碼');
       return;
     }
 
@@ -198,6 +199,7 @@ export default function HomePage() {
 
       if (roomErr || !room) {
         toast.error('房間不存在，請重新輸入');
+        alert('查無此房間代碼，請確認後重新輸入');
         setJoinCode('');
         return;
       }
