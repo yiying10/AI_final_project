@@ -1,0 +1,33 @@
+{
+  "name": "ai_final_project",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run --workspace=@apps/web dev",
+    "build": "npm run --workspace=@apps/web build",
+    "lint": "npm run --workspaces lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yiying10/AI_final_project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yiying10/AI_final_project/issues"
+  },
+  "homepage": "https://github.com/yiying10/AI_final_project#readme",
+  "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.10.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21"
+  }
+}

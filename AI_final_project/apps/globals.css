@@ -1,0 +1,7 @@
+/* apps/web/src/app/globals.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 下面再放你的自訂樣式… */
