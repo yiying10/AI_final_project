@@ -11,6 +11,17 @@ interface Player {
   role_id: string;
 }
 
+interface Gamerole {
+  id: string;
+  script_id: string;
+  name: string;
+  public_info: string;
+  secret: string;
+  mission: string;
+  dialogue1: string;
+  dialogue2: string;
+}
+
 interface Props {
   playerId: string;
   roomId: string;
@@ -19,20 +30,41 @@ interface Props {
 
 const VotingPhase = ({ playerId, roomId, setCurrentPhase }: Props) => {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [roleMap, setRoleMap] = useState<Record<string, string>>({});
   const [votes, setVotes] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
-    const fetchPlayers = async () => {
-      const { data, error } = await supabase
+    const fetchData = async () => {
+      const { data: playerData, error: playerError } = await supabase
         .from('player')
         .select('id, room_id, name, is_host, role_id')
         .eq('room_id', roomId);
 
-      if (!error && data) setPlayers(data);
-      else console.error('獲取玩家列表失敗:', error);
+      if (playerError || !playerData) {
+        console.error('獲取玩家列表失敗:', playerError);
+        return;
+      }
+
+      setPlayers(playerData);
+
+      const { data: roleData, error: roleError } = await supabase
+        .from('gamerole')
+        .select('id, name');
+
+      if (roleError || !roleData) {
+        console.error('獲取角色名稱失敗:', roleError);
+        return;
+      }
+
+      const roleMapObj: Record<string, string> = {};
+      roleData.forEach((role) => {
+        roleMapObj[role.id] = role.name;
+      });
+
+      setRoleMap(roleMapObj);
     };
 
-    fetchPlayers();
+    fetchData();
   }, [roomId]);
 
   const handleVote = async (targetId: string | null) => {
@@ -47,7 +79,6 @@ const VotingPhase = ({ playerId, roomId, setCurrentPhase }: Props) => {
 
     setVotes((prev) => ({ ...prev, [playerId]: targetId }));
 
-    // 檢查是否所有人已投票
     const { data: allVotes, error: fetchError } = await supabase
       .from('vote')
       .select('voter_id')
@@ -93,7 +124,7 @@ const VotingPhase = ({ playerId, roomId, setCurrentPhase }: Props) => {
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               disabled={!!votes[playerId]}
             >
-              投票給 {player.role_id}
+              投票給 {roleMap[player.role_id] || '未知角色'}
             </button>
           </li>
         ))}

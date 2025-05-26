@@ -64,7 +64,7 @@ export default function HomePage() {
       const { data: room, error: roomErr } = await supabase
         .from("room")
         .insert([{ 
-          room_code: code, 
+          room_code: parseInt(code, 10),
           status: 'waiting',
           script_id: null,
           host_id: null,
@@ -185,7 +185,7 @@ export default function HomePage() {
       const { data: room, error: roomErr } = await supabase
         .from('room')
         .select('*')
-        .eq('room_code', code)
+        .eq('room_code', parseInt(code, 10))
         .single();
 
       if (roomErr || !room) {

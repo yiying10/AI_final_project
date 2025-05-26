@@ -46,22 +46,22 @@ export default function RoleSelectionPhase({
   useEffect(() => {
     const fetchScript = async () => {
       // 先查 Room 拿到 script_id
-      const { data: roomData, error: roomError } = await supabase
-        .from('room')
-        .select('script_id')
-        .eq('id', roomId)
+      const { data: scriptData, error: roomError } = await supabase
+        .from('gamescript')
+        .select('id')
+        .eq('room_id', roomId)
         .single();
   
-      if (roomError || !roomData?.script_id) {
+      if (roomError || !scriptData?.id) {
         console.error('讀取房間劇本失敗:', roomError);
         return;
       }
   
-      const scriptId = roomData.script_id;
+      const scriptId = scriptData.id;
   
       // 再查 GameRole 拿到角色清單
       const { data: rolesData, error: rolesError } = await supabase
-        .from('GameRole')
+        .from('gamerole')
         .select('id, script_id, name, public_info, secret, mission')
         .eq('script_id', scriptId);
   

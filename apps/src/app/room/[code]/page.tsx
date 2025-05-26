@@ -50,7 +50,7 @@ export default function RoomPage() {
         const { data: room, error: roomErr } = await supabase
           .from('room')
           .select('*')
-          .eq('room_code', codeParam)
+          .eq('room_code', parseInt(codeParam, 10))
           .single();
 
         if (roomErr || !room) {

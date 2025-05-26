@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { generateStory } from '../lib/storyGenerator';
-import { generateWorld } from '../lib/WorldGenerator';
+import { backgroundGenerator } from '../lib/backgroundGenerator';
+import { generateWorldAndSave } from '../lib/WorldGenerator';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
 
@@ -8,16 +8,16 @@ interface IntroductionPhaseProps {
   roomId: string;
   playerId: string;
   isHost: boolean;
+  roomCode: number;
   setCurrentPhase: (phase: string) => void;
 }
 
-export default function IntroductionPhase({ roomId, playerId, isHost, setCurrentPhase }: IntroductionPhaseProps) {
+export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, setCurrentPhase }: IntroductionPhaseProps) {
   const [prompt, setPrompt] = useState('');
-  const [generatingStory, setGeneratingStory] = useState(false);
-  const [storySummary, setStorySummary] = useState<string | null>(null);
+  const [generatingBackground, setGeneratingBackground] = useState(false);
+  const [storySummary, setStorySummary] = useState<string>("");
   const [scriptPrompt, setScriptPrompt] = useState<string | null>(null);
 
-  // 🚀 通用的劇本載入邏輯
   const loadScriptFromRoom = async () => {
     const { data: roomData, error: roomError } = await supabase
       .from('rooms')
@@ -39,11 +39,9 @@ export default function IntroductionPhase({ roomId, playerId, isHost, setCurrent
     setScriptPrompt(script.prompt);
   };
 
-  // ✅ 初次載入
   useEffect(() => {
     loadScriptFromRoom();
 
-    // ✅ 實時監聽房間 script_id 變化（即時更新劇本）
     const subscription = supabase
       .channel(`room-${roomId}`)
       .on(
@@ -68,58 +66,58 @@ export default function IntroductionPhase({ roomId, playerId, isHost, setCurrent
     };
   }, [roomId]);
 
-  const handleGenerateStory = async () => {
+  const handleGenerateBackground = async () => {
     if (!prompt.trim()) {
       toast.error('請輸入有效的提示詞');
       alert('請輸入有效的提示詞');
       return;
     }
-
-    setGeneratingStory(true);
+  
+    setGeneratingBackground(true);
     try {
-      const newScript = await generateStory(roomId, prompt);
-      if (!newScript) throw new Error('生成劇本失敗：未返回劇本數據');
-
-      const { data: insertedScript, error: insertError } = await supabase
-        .from('gameScript')
-        .insert({
-          room_id: roomId,
-          title: newScript.title,
-          background: newScript.background,
-          prompt,
-        })
-        .select()
-        .single();
-
-      if (insertError || !insertedScript) throw new Error('儲存劇本失敗：' + insertError?.message);
-
-      const { error: updateRoomError } = await supabase
-        .from('rooms')
-        .update({ script_id: insertedScript.id })
-        .eq('id', roomId);
-
-      if (updateRoomError) throw new Error('更新房間資料失敗：' + updateRoomError.message);
-
-      toast.success('劇本生成並儲存成功！');
+      const newBackground = await backgroundGenerator(roomCode, prompt);
+      if (!newBackground) throw new Error('生成劇本失敗：未返回背景數據');
+  
+      setStorySummary(newBackground);  // 暫存背景
+      setScriptPrompt(prompt);         // 暫存 prompt
+  
+      toast.success('劇本背景生成成功！');
     } catch (error) {
       console.error('生成劇本失敗：', error);
       toast.error(error instanceof Error ? error.message : '生成劇本失敗，請重試');
     } finally {
-      setGeneratingStory(false);
+      setGeneratingBackground(false);
     }
   };
+  
+  
 
   const handleRoleSelection = async () => {
     try {
-      const result = await generateWorld(roomId);
-      if (!result) throw new Error('生成世界內容失敗');
-      toast.success('世界內容生成成功！');
+      const worldData = await generateWorldAndSave(
+        roomId,
+        roomCode,
+        prompt,
+        storySummary,
+        {
+          num_characters: 4,
+          num_npcs: 3,
+          num_acts: 2,
+        }
+      );
+  
+      console.log('世界資料:', worldData);
+      toast.success('世界資料生成成功！');
+      
       setCurrentPhase('role_selection');
+  
     } catch (error) {
-      console.error('生成世界內容失敗：', error);
-      toast.error(error instanceof Error ? error.message : '生成世界內容失敗，請重試');
+      console.error('生成世界資料失敗:', error);
+      toast.error(error instanceof Error ? error.message : '生成世界資料失敗');
     }
   };
+  
+  
 
   return (
     <div className="bg-gray-100 px-4 py-4 rounded shadow-sm">
@@ -152,11 +150,11 @@ export default function IntroductionPhase({ roomId, playerId, isHost, setCurrent
             placeholder="例如：一個發生在古堡的謀殺案"
           />
           <button
-            onClick={handleGenerateStory}
-            disabled={generatingStory}
-            className={`px-4 py-2 text-white rounded ${generatingStory ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'}`}
+            onClick={handleGenerateBackground}
+            disabled={generatingBackground}
+            className={`px-4 py-2 text-white rounded ${generatingBackground ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'}`}
           >
-            {generatingStory ? '生成中...' : '生成劇本'}
+            {generatingBackground ? '生成中...' : '生成劇本'}
           </button>
         </div>
       )}
@@ -167,11 +165,10 @@ export default function IntroductionPhase({ roomId, playerId, isHost, setCurrent
             onClick={handleRoleSelection}
             className="px-5 py-2 bg-green-500 text-white rounded hover:bg-green-600"
           >
-            選擇角色
+            決定劇本並選擇角色
           </button>
         </div>
       )}
-
       {isHost /*&& storySummary*/ && (
         <div className="mt-6">
           <button

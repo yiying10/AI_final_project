@@ -39,6 +39,7 @@ export default function GameContent({
   const gameContent = getGameContent();
   const [isHost, setIsHost] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'map' | 'chat'>('map');
+  const [roomCode, setRoomCode] = useState<number>(0);
 
   const phaseList = [
     'introduction',
@@ -48,6 +49,23 @@ export default function GameContent({
     'voting',
     'ended',
   ];
+  useEffect(() => {
+    const fetchRoomCode = async () => {
+      const { data, error } = await supabase
+        .from('room')
+        .select('room_code')
+        .eq('id', roomId)
+        .single();
+  
+      if (!error && data) {
+        setRoomCode(data.room_code);
+      } else {
+        console.error('獲取 room_code 失敗:', error);
+      }
+    };
+  
+    fetchRoomCode();
+  }, [roomId]);
 
   const goToNextPhase = async () => {
     setCurrentPhase((prevPhase) => {
@@ -153,6 +171,7 @@ export default function GameContent({
           <IntroductionPhase
             isHost={isHost}
             roomId={roomId}
+            roomCode={roomCode}
             playerId={playerId}
             setCurrentPhase={goToNextPhase} // 使用通用函式
           />
