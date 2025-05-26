@@ -1,0 +1,14 @@
+pip install -r requirements.txt
+// api設置
+https://ai.google.dev/gemini-api/docs/quickstart?lang=python&hl=zh-tw
+// 拿到key後放到在 back-end/backend 建.env，後裡面放: GOOGLE_API_KEY= 你的key
+// run
+python -m uvicorn --reload backend.app.main:app
+// 要到這個網頁，有些地方可以修改參數，LLM就會生東西出來
+http://127.0.0.1:8000/docs#/
+
+
+
+
+// 這個test不用管他
+//py -m pytest tests/test_api.py
