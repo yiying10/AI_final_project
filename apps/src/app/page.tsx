@@ -6,6 +6,14 @@ import { supabase } from './lib/supabaseClient';
 import { toast } from 'react-hot-toast';
 import { MAX_PLAYER } from './lib/config';
 
+interface Player {
+  id: string;
+  room_id: string;
+  name: string;
+  is_host: boolean;
+  role_id: string | null;
+}
+
 function generateRoomCode(): string {
   const min = 100000;
   const max = 999999;
@@ -23,6 +31,10 @@ export default function HomePage() {
   const [joinCode, setJoinCode] = useState('');
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [player, setPlayer] = useState<Player | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
 
   useEffect(() => {
     const existingCode = localStorage.getItem('user_code');
@@ -74,99 +86,78 @@ export default function HomePage() {
 
       console.log('房間創建成功：', room);
 
-      // 查看 Player 表结构，仅使用必要字段
-      console.log('準備創建玩家，房間ID:', room.id, '暱稱:', name || userCode);
-      
-      let createdPlayer;
+      // 創建新玩家（不需要提供id，数据库会自动生成）
+      const isHost = !players || players.length === 0;
+      console.log('準備創建新玩家，房間ID:', room.id, '暱稱:', name || userCode, '是否為房主:', isHost);
+
       try {
-        const { data: player, error: playerErr } = await supabase
+        const { data: newPlayer, error: createErr } = await supabase
           .from('player')
           .insert([{
             room_id: room.id,
             name: name || userCode,
-            is_host: true,
-            role_id: null,
+            is_host: isHost,
+            role_id: null
           }])
-          .select()
+          .select('id, room_id, name, is_host, role_id')
           .single();
 
-        if (playerErr) {
-          console.error('創建玩家失敗，錯誤詳情:', playerErr);
-          toast.error('建立玩家失敗：' + playerErr.message);
-          
-          // 清理：如果創建玩家失敗，刪除已創建的房間
-          await supabase
-            .from('room')
-            .delete()
-            .eq('id', room.id);
-            
+        if (createErr) {
+          console.error('创建玩家失败，錯誤詳情:', createErr);
+          setError('創建玩家失敗: ' + createErr.message);
+          setLoading(false);
           return;
         }
 
-        if (!player) {
-          console.error('創建玩家失敗：未返回玩家數據');
-          toast.error('建立玩家失敗：未返回玩家數據');
-          
-          // 清理：如果創建玩家失敗，刪除已創建的房間
-          await supabase
-            .from('room')
-            .delete()
-            .eq('id', room.id);
-            
+        if (!newPlayer) {
+          console.error('创建玩家失败: 未返回玩家數據');
+          setError('創建玩家失敗: 未返回玩家數據');
+          setLoading(false);
           return;
         }
+
+        console.log('成功创建新玩家:', newPlayer);
         
-        createdPlayer = player;
+        // 保存玩家ID到localStorage
+        localStorage.setItem(`player_id_${code}`, newPlayer.id);
+        localStorage.setItem(`player_created_${code}`, 'true');
 
-        // 檢查玩家是否真的被創建
-        const { data: checkPlayer } = await supabase
-          .from('player')
-          .select('*')
-          .eq('id', player.id)
-          .single();
-          
-        if (checkPlayer) {
-          console.log('確認玩家已成功創建:', checkPlayer);
-        } else {
-          console.warn('警告：無法確認玩家是否成功創建');
+        // 如果是房主，更新房间的创建者ID
+        if (isHost) {
+          const { error: updateRoomErr } = await supabase
+            .from('room')
+            .update({ host_id: newPlayer.id })
+            .eq('id', room.id);
+
+          if (updateRoomErr) {
+            console.error('更新房间创建者失败:', updateRoomErr);
+          }
         }
+
+        setPlayer(newPlayer);
+        setPlayers(players ? [...players, newPlayer] : [newPlayer]);
 
         // 發送系統消息：玩家創建了房間
         try {
-          await supabase.from('messages').insert([{
+          await supabase.from('message').insert([{
             room_id: room.id,
-            sender_id: player.id,
+            sender_id: newPlayer.id,
             receiver_id: null,
-            content: `${player.name} 創建了房間`,
+            content: `${newPlayer.name} 創建了房間`,
           }]);
         } catch (messageError) {
           console.error('發送系統消息失敗:', messageError);
           // 不中斷流程，繼續執行
         }
 
-        console.log('玩家創建成功：', player);
-        
-        // 保存玩家ID和暱稱到localStorage
-        localStorage.setItem(`player_id_${code}`, player.id);
-        localStorage.setItem(`player_created_${code}`, 'true');
-        if (name) {
-          localStorage.setItem('user_name', name);
-        }
-      } catch (createPlayerError) {
-        console.error('創建玩家時發生異常:', createPlayerError);
-        toast.error('創建玩家時發生異常: ' + (createPlayerError instanceof Error ? createPlayerError.message : '未知錯誤'));
-        
-        // 清理：如果創建玩家失敗，刪除已創建的房間
-        await supabase
-          .from('room')
-          .delete()
-          .eq('id', room.id);
-          
+        toast.success('房間創建成功！');
+        router.push(`/room/${code}`);
+      } catch (insertError) {
+        console.error('創建玩家時發生異常:', insertError);
+        setError('創建玩家時發生異常: ' + (insertError instanceof Error ? insertError.message : '未知錯誤'));
+        setLoading(false);
         return;
       }
-      
-      toast.success('房間創建成功！');
-      router.push(`/room/${code}`);
     } catch (error) {
       console.error('創建房間時發生錯誤：', error);
       toast.error('創建房間時發生錯誤：' + (error instanceof Error ? error.message : '未知錯誤'));
@@ -222,9 +213,9 @@ export default function HomePage() {
           room_id: room.id,
           name: name || userCode,
           is_host: false,
-          role: null,
+          role_id: null
         }])
-        .select()
+        .select('id, room_id, name, is_host, role_id')
         .single();
 
       if (playerErr || !player) {
@@ -234,7 +225,7 @@ export default function HomePage() {
 
       // 發送系統消息：玩家加入了房間
       try {
-        await supabase.from('messages').insert([{
+        await supabase.from('message').insert([{
           room_id: room.id,
           sender_id: player.id,
           receiver_id: null,

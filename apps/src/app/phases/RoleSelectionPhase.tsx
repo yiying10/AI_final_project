@@ -80,19 +80,19 @@ export default function RoleSelectionPhase({
 
   const fetchInitialData = async () => {
     const [{ data: playerData }, { data: allPlayers }] = await Promise.all([
-      supabase.from('player').select('role').eq('id', playerId).single(),
-      supabase.from('player').select('role').eq('room_id', roomId),
+      supabase.from('player').select('role_id').eq('id', playerId).single(),
+      supabase.from('player').select('role_id').eq('room_id', roomId),
     ]);
 
-    if (playerData?.role) {
-      const selected = characters.find((c) => c.name === playerData.role);
+    if (playerData?.role_id) {
+      const selected = characters.find((c) => c.id === playerData.role_id);
       if (selected) setPlayerInfo(selected);
     }
 
-    const selected = allPlayers?.map((p: any) => p.role).filter(Boolean) || [];
+    const selected = allPlayers?.map((p: any) => p.role_id).filter(Boolean) || [];
     setSelectedRoles(selected);
 
-    const allChosen = !!(allPlayers && allPlayers.length > 0 && allPlayers.every((p: any) => p.role));
+    const allChosen = !!(allPlayers && allPlayers.length > 0 && allPlayers.every((p: any) => p.role_id));
     setAllSelected(allChosen);
   };
 
@@ -134,7 +134,7 @@ export default function RoleSelectionPhase({
     const sendSystemMessage = async () => {
       // 檢查是否已經有類似訊息，避免重複發送
       const { data: messages } = await supabase
-        .from('messages')
+        .from('message')
         .select()
         .eq('room_id', roomId)
         .eq('sender_id', SYSTEM_USER_ID)
@@ -142,7 +142,7 @@ export default function RoleSelectionPhase({
         .limit(1);
   
       if (!messages || messages.length === 0) {
-        const { error } = await supabase.from('messages').insert([
+        const { error } = await supabase.from('message').insert([
           {
             room_id: roomId,
             sender_id: SYSTEM_USER_ID,
@@ -182,7 +182,7 @@ export default function RoleSelectionPhase({
     // 更新玩家角色
     const { error: updateError } = await supabase
       .from('player')
-      .update({ role: game_role.id })
+      .update({ role_id: game_role.id })
       .eq('id', playerId);
   
     if (updateError) {
@@ -206,7 +206,7 @@ export default function RoleSelectionPhase({
       return;
     }
   
-    const { error: messageError } = await supabase.from('messages').insert([
+    const { error: messageError } = await supabase.from('message').insert([
       {
         room_id: roomId,
         sender_id: SYSTEM_USER_ID,
