@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 import { useRouter } from 'next/navigation';
-import { getGameContent } from './lib/Map';
 import {SYSTEM_USER_ID} from './lib/config';
 import ChatRoom from "./ChatRoom";
 
@@ -36,7 +35,6 @@ export default function GameContent({
   const [timer, setTimer] = useState<number>(300);
   const [playerInfo, setPlayerInfo] = useState<any>(null);
   const [discoveredClues, setDiscoveredClues] = useState<string[]>([]);
-  const gameContent = getGameContent();
   const [isHost, setIsHost] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'map' | 'chat'>('map');
   const [roomCode, setRoomCode] = useState<number>(0);
@@ -190,14 +188,12 @@ export default function GameContent({
 
       case 'investigation':
         return <InvestigationPhase
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
           timer={timer}
           setTimer={setTimer}
           discoveredClues={discoveredClues}
           setDiscoveredClues={setDiscoveredClues}
-          gameContent={gameContent}
           roomId={roomId}
+          roomCode={roomCode}
           playerId={playerId}
           setCurrentPhase={goToNextPhase} // 使用通用函式
          />;

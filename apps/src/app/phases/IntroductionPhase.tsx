@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { backgroundGenerator } from '../lib/backgroundGenerator';
 import { generateWorldAndSave } from '../lib/WorldGenerator';
-import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
+import { toast } from 'react-hot-toast';
 
 interface IntroductionPhaseProps {
   roomId: string;
@@ -17,6 +17,7 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
   const [generatingBackground, setGeneratingBackground] = useState(false);
   const [storySummary, setStorySummary] = useState<string>("");
   const [scriptPrompt, setScriptPrompt] = useState<string | null>(null);
+  const [generatingWorld, setGeneratingWorld] = useState(false);
 
   const loadScriptFromRoom = async () => {
     const { data: roomData, error: roomError } = await supabase
@@ -93,7 +94,9 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
   
 
   const handleRoleSelection = async () => {
+    setGeneratingWorld(true);
     try {
+      console.log('發送 generateWorld 請求...');
       const worldData = await generateWorldAndSave(
         roomId,
         roomCode,
@@ -114,6 +117,9 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
     } catch (error) {
       console.error('生成世界資料失敗:', error);
       toast.error(error instanceof Error ? error.message : '生成世界資料失敗');
+    }
+    finally {
+      setGeneratingWorld(false); // 結束 loading
     }
   };
   
@@ -159,23 +165,14 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
         </div>
       )}
 
-      {isHost /*&& storySummary*/ && (
+      {isHost && storySummary && (
         <div className="mt-6">
           <button
+            disabled={generatingWorld}
             onClick={handleRoleSelection}
-            className="px-5 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            className={`px-5 py-2 text-white rounded ${generatingWorld ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'}`}
           >
-            決定劇本並選擇角色
-          </button>
-        </div>
-      )}
-      {isHost /*&& storySummary*/ && (
-        <div className="mt-6">
-          <button
-            onClick={setCurrentPhase.bind(null, 'role_selection')}
-            className="px-5 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-          >
-            下一步
+            {generatingWorld ? '生成中...' : '決定劇本並創建角色'}
           </button>
         </div>
       )}

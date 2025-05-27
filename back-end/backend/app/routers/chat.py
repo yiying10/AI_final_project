@@ -28,8 +28,8 @@ class ChatResponse(BaseModel):
 @router.post("/{player_id}/chat/{npc_id}", response_model=ChatResponse)
 async def chat_with_npc(
     game_id: int,
-    player_id: int,
-    npc_id: int,
+    player_id: str,
+    npc_id: str,
     req: ChatRequest,
     session: Session = Depends(get_session),
 ):
