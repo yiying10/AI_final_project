@@ -117,26 +117,44 @@ async def call_llm_for_chat(
     character: Dict[str, Any],
     history: List[Any],  # Message ORM 或 dict
     user_text: str,
+    unlockable_objects: List[Dict[str, Any]] = None,  # 新增這個參數
     model: str = "gemini-2.0-flash",
     temperature: float = 0.7,
     max_tokens: int = 500,
 ) -> Dict[str, Any]:
     """
-    根據遊戲背景、角色設定及對話歷史，呼叫 Gemini 生成 NPC 回應。
+    根據遊戲背景、角色設定、對話歷史及可解鎖物件，呼叫 Gemini 生成 NPC 回應。
     回傳包含 dialogue, hint, evidence 三個欄位。
     """
-    # 1. 系統指令
+    
+    # 1. 構建可解鎖物件信息
+    objects_info = ""
+    if unlockable_objects and len(unlockable_objects) > 0:
+        objects_info = "\n\n你可以提供以下物件的相關信息或線索：\n"
+        for obj in unlockable_objects:
+            objects_info += f"- {obj['name']} (位於{obj['location']})："
+            if obj.get('content'):
+                objects_info += f" {obj['content']}\n"
+            else:
+                objects_info += " 這個物件可能包含重要線索\n"
+    
+    # 2. 系統指令
     system_instruction_text = (
         f"你現在扮演劇本殺遊戲中的角色。你的角色是：{character['name']} ({character['role']})。\n"
         f"遊戲背景如下：\n{background}\n\n"
         f"角色的公開資訊：{character['public_info']}。\n"
-        f"角色的秘密任務是：{character['mission']}。\n\n"
-        "所有輸出只能用繁體中文"
-        "請完全以此角色的身份和口吻回應玩家，並嚴格以 JSON 物件格式回傳，"
-        "只包含欄位 dialogue, hint, evidence。"
+        f"角色的秘密任務是：{character['mission']}。\n"
+        f"{objects_info}\n"
+        "所有輸出只能用繁體中文\n"
+        "請完全以此角色的身份和口吻回應玩家。\n"
+        "如果玩家詢問或暗示想要了解你能提供線索的物件，你可以：\n"
+        "1. 在對話中自然地提及相關線索\n"
+        "2. 在 hint 欄位提供具體的線索信息\n"
+        "3. 如果適當，在 evidence 欄位提供物件作為證據\n"
+        "請嚴格以 JSON 物件格式回傳，只包含欄位 dialogue, hint, evidence。"
     )
 
-    # 2. 構建對話內容（只放 user 和 assistant）
+    # 3. 構建對話內容（只放 user 和 assistant）
     gemini_contents: List[types.Content] = []
     for msg in history:
         role = getattr(msg, 'role', None) or msg.get('role')
@@ -149,18 +167,27 @@ async def call_llm_for_chat(
         types.Content(parts=[types.Part(text=user_text)], role='user')
     )
 
-    # 3. 定義回傳的 JSON schema
+    # 4. 定義回傳的 JSON schema
     response_schema = types.Schema(
         type=types.Type.OBJECT,
         properties={
             'dialogue': types.Schema(type=types.Type.STRING, description="角色對話"),
             'hint':     types.Schema(type=types.Type.STRING, nullable=True, description="提示，可為 null"),
-            'evidence': types.Schema(type=types.Type.STRING, nullable=True, description="證據，可為 null"),
+            'evidence': types.Schema(
+                type=types.Type.OBJECT, 
+                nullable=True, 
+                description="證據物件，可為 null",
+                properties={
+                    'id': types.Schema(type=types.Type.STRING, description="物件 ID"),
+                    'name': types.Schema(type=types.Type.STRING, description="物件名稱"),
+                    'description': types.Schema(type=types.Type.STRING, description="物件描述")
+                }
+            ),
         },
         required=['dialogue']
     )
 
-    # 4. 配置生成參數，並將系統指令放到 system_instruction
+    # 5. 配置生成參數，並將系統指令放到 system_instruction
     gen_config = types.GenerateContentConfig(
         temperature=temperature,
         max_output_tokens=max_tokens,
@@ -170,7 +197,7 @@ async def call_llm_for_chat(
         system_instruction=system_instruction_text
     )
 
-    # 5. 同步呼叫 Gemini
+    # 6. 同步呼叫 Gemini
     def _sync_call():
         return client.models.generate_content(
             model=model,
@@ -180,7 +207,7 @@ async def call_llm_for_chat(
 
     resp = await asyncio.to_thread(_sync_call)
 
-    # 6. 解析回傳
+    # 7. 解析回傳
     text = resp.text.strip()
     try:
         data = json.loads(text)
