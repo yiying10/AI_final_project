@@ -368,7 +368,7 @@ async def call_llm_for_locations(
         " 1) id (整數，地點識別，從 1 開始)、"
         " 2) name (地點名稱)、"
         " 3) npcs (整數陣列，對應 NPC 的 id)、"
-        " 4) objects (物件陣列，每個物件要有 id, name, lock(boolean), clue(string或null), owner_id(integer, 預設為null))。"
+        " 4) objects (物件陣列，每個物件要有 id, name, lock(int), clue(string或null), owner_id(integer, 預設為null))。"
         "務必只回傳純 JSON 陣列，不要多任何說明文字。"
         "只能用繁體中文"
     )
@@ -393,7 +393,7 @@ async def call_llm_for_locations(
                         "properties": {
                             "id":   {"type": "integer"},
                             "name": {"type": "string"},
-                            "lock": {"type": "boolean"},
+                            "lock": {"type": "integer", "nullable": True, "description": "可解鎖此物件的 NPC ID"},
                             "clue": {"type": "string", "nullable": True},
                             "owner_id": {"type": "integer", "nullable": True, "description": "已解鎖此物件的玩家 ID"}
                         },
