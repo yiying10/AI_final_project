@@ -136,7 +136,7 @@ class MemoryService:
                 game_obj = GameObj(
                     location_id=location.id,
                     name=obj.get("name"),
-                    lock=obj.get("lock", False),
+                    lock=obj.get("lock"),
                     clue=obj.get("clue"),
                     owner_id=obj.get("owner_id"),
                 )
