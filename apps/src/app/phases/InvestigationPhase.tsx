@@ -2,40 +2,29 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { SYSTEM_USER_ID } from '../lib/config';
+import { chatWithNPC } from '../lib/chatWithNPC';
 
 interface InvestigationPhaseProps {
-  activeTab: 'map' | 'chat';
-  setActiveTab: React.Dispatch<React.SetStateAction<'map' | 'chat'>>;
   timer: number;
   discoveredClues: string[];
   setDiscoveredClues: React.Dispatch<React.SetStateAction<string[]>>;
-  gameContent: {
-    location: string;
-    objects: { name: string; clue: string }[];
-  }[];
   roomId: string;
+  roomCode: number;
   playerId: string;
   setCurrentPhase: React.Dispatch<React.SetStateAction<string>>;
   setTimer: React.Dispatch<React.SetStateAction<number>>;
 }
 
 const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
-  activeTab,
-  setActiveTab,
   timer,
-  discoveredClues,
-  setDiscoveredClues,
-  gameContent,
   roomId,
+  roomCode,
   playerId,
   setCurrentPhase,
   setTimer,
 }) => {
   // 基本狀態
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
-<<<<<<< Updated upstream
-  const [selectedItem, setSelectedItem] = useState<{ name: string; clue: string } | null>(null);
-=======
   const [selectedDetail, setSelectedDetail] = useState<{ 
     type: 'object' | 'npc'; 
     name: string; 
@@ -74,11 +63,10 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
     message: string, 
     npcName?: string
   }>>([]);
->>>>>>> Stashed changes
 
+  // 倒數計時器
   useEffect(() => {
-    setTimer(30); // 初始倒數時間
-
+    setTimer(180);
     const interval = setInterval(() => {
       setTimer((prev) => {
         if (prev <= 1) {
@@ -100,32 +88,9 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(interval);
   }, [roomId, setCurrentPhase, setTimer]);
 
-<<<<<<< Updated upstream
-  return (
-    <div className="bg-gray-50 p-4 rounded-lg border">
-      <div className="mb-4 text-right text-lg font-bold text-red-600">
-        倒計時：{timer} 秒
-      </div>
-
-      {activeTab === 'map' && (
-        <div>
-          <h3 className="text-xl font-bold mb-3">地圖</h3>
-
-          {/* 沒有選擇地點時，顯示所有地點 */}
-          {!selectedLocation && (
-            <div className="grid grid-cols-2 gap-4">
-              {gameContent.map((loc, index) => (
-                <div
-                  key={index}
-                  onClick={() => setSelectedLocation(loc.location)}
-                  className="p-4 bg-indigo-100 rounded hover:bg-indigo-200 cursor-pointer"
-                >
-                  {loc.location}
-=======
   // 取得資料
   useEffect(() => {
     async function fetchData() {
@@ -334,60 +299,12 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
                   className="p-4 bg-indigo-100 rounded-lg hover:bg-indigo-200 cursor-pointer transition-colors shadow-sm border border-indigo-200"
                 >
                   <div className="font-semibold text-indigo-800">{loc.name}</div>
->>>>>>> Stashed changes
                 </div>
               ))}
             </div>
-          )}
+          </div>
+        )}
 
-<<<<<<< Updated upstream
-          {/* 選擇地點後，顯示此地點內的物件 */}
-          {selectedLocation && !selectedItem && (
-            <div>
-              <button
-                onClick={() => setSelectedLocation(null)}
-                className="text-sm text-blue-600 underline mb-2"
-              >
-                返回地圖
-              </button>
-              <h4 className="text-lg font-bold mb-2">{selectedLocation} 內的物件與 NPC</h4>
-              <div className="grid grid-cols-2 gap-4">
-                {gameContent
-                  .find((loc) => loc.location === selectedLocation)
-                  ?.objects.map((obj, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => setSelectedItem(obj)}
-                      className="p-4 bg-green-100 rounded hover:bg-green-200 cursor-pointer"
-                    >
-                      {obj.name}
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* 顯示物件/角色的詳細內容 */}
-          {selectedItem && (
-            <div>
-              <button
-                onClick={() => setSelectedItem(null)}
-                className="text-sm text-blue-600 underline mb-2"
-              >
-                返回 {selectedLocation}
-              </button>
-              <h4 className="text-lg font-bold mb-2">{selectedItem.name} 的線索</h4>
-              <p className="bg-white p-2 rounded border">{selectedItem.clue || '無更多資訊'}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'chat' && (
-        <div>
-          <h3 className="text-xl font-bold mb-3">聊天室</h3>
-          <p>此處可以顯示聊天室內容。</p>
-=======
         {/* 地點詳情 - 顯示物件和 NPC */}
         {selectedLocation !== null && !selectedDetail && (
           <div>
@@ -595,7 +512,6 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
       {!gameBackground && (
         <div className="fixed top-4 right-4 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 rounded-lg">
           <span className="animate-pulse">📡 載入遊戲資料中...</span>
->>>>>>> Stashed changes
         </div>
       )}
     </div>
