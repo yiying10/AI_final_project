@@ -8,7 +8,17 @@ import { toast } from 'react-hot-toast';
 import GameContent from '../../GameContent';
 import { MAX_PLAYER } from '../../lib/config';
 // 遊戲狀態
-type GameStatus = 'waiting' | 'introduction' | 'selecting_roles' | 'investigation1' | 'discussion1' |  'investigation2' | 'discussion2' | 'voting' | 'ended';
+type GameStatus = 'introduction'|
+    'role_selection'|
+    'dialogue1'|
+    'investigation'|
+    'discussion'|
+    'dialogue2'|
+    'investigation'|
+    'discussion'|
+    'voting'|
+    'ended'|
+    'waiting';
 
 interface Player {
   id: string;
@@ -221,11 +231,30 @@ export default function RoomPage() {
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'player', filter: `room_id=eq.${room.id}` },
-      (payload) => {
+      async (payload) => {
         console.log('玩家變更:', payload);
         loadPlayers();
+    
+        if (payload.eventType === 'DELETE') {
+          const deletedPlayer = payload.old as Player;
+          console.log('玩家離開:', deletedPlayer);
+    
+          // 發送系統訊息
+          try {
+            await supabase.from('message').insert([{
+              room_id: room.id,
+              sender_id: null,
+              receiver_id: null,
+              content: `${deletedPlayer.name} 已離開房間`,
+            }]);
+            console.log('已發送玩家離開房間的系統訊息');
+          } catch (err) {
+            console.error('發送系統訊息失敗:', err);
+          }
+        }
       }
     )
+    
     .subscribe();
 
   loadPlayers();

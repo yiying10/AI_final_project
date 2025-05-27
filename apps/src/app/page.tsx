@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from './lib/supabaseClient';
 import { toast } from 'react-hot-toast';
-import { MAX_PLAYER, SYSTEM_USER_ID } from './lib/config';
+import { MAX_PLAYER } from './lib/config';
 
 interface Player {
   id: string;
@@ -47,7 +47,23 @@ export default function HomePage() {
       setUserCode(newCode);
     }
   }, []);
-
+  useEffect(() => {
+    const subscription = supabase
+      .channel('player-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'player' }, payload => {
+        console.log('玩家更新:', payload);
+        if (payload.eventType === 'INSERT') {
+          setPlayers(prev => [...prev, payload.new as Player]);
+        } else if (payload.eventType === 'DELETE') {
+          setPlayers(prev => prev.filter(p => p.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+  
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, []);
   // 創建房間，並建立房主玩家
   async function createRoom() {
     if (!userCode) {
@@ -85,27 +101,7 @@ export default function HomePage() {
       }
 
       console.log('房間創建成功：', room);
-      // 新增系統玩家
-      try {
-        const { error: systemPlayerErr } = await supabase
-          .from('player')
-          .insert([{
-            id: SYSTEM_USER_ID, // 使用固定的 SYSTEM_USER_ID
-            room_id: room.id,
-            name: '系統',
-            is_host: false,
-            role_id: null,
-          }]);
-
-        if (systemPlayerErr) {
-          console.error('新增系統玩家失敗:', systemPlayerErr);
-        } else {
-          console.log('成功新增系統玩家');
-        }
-      } catch (systemError) {
-        console.error('新增系統玩家時發生錯誤:', systemError);
-      }
-
+      
       // 創建新玩家（不需要提供id，数据库会自动生成）
       const isHost = !players || players.length === 0;
       console.log('準備創建新玩家，房間ID:', room.id, '暱稱:', name || userCode, '是否為房主:', isHost);
@@ -161,7 +157,7 @@ export default function HomePage() {
         try {
           await supabase.from('message').insert([{
             room_id: room.id,
-            sender_id: SYSTEM_USER_ID,
+            sender_id: null, // 改為 null 代表系統
             receiver_id: null,
             content: `${newPlayer.name} 創建了房間`,
           }]);
@@ -247,7 +243,7 @@ export default function HomePage() {
       try {
         await supabase.from('message').insert([{
           room_id: room.id,
-          sender_id: player.id,
+          sender_id: null, // 改為 null 代表系統
           receiver_id: null,
           content: `${player.name} 加入了房間`,
         }]);

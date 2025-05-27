@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
-import { SYSTEM_USER_ID } from './lib/config';
 import { RealtimePostgresInsertPayload } from '@supabase/supabase-js'; // 可選加型別
 
 interface Message {
@@ -55,15 +54,25 @@ export default function ChatRoom({ roomId, playerId, players, setPlayers }: Chat
     fetchMessages();
 
     const messageChannel = supabase
-      .channel(`message:room_id=eq.${roomId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message', filter: `room_id=eq.${roomId}` }, (payload) => {
-        const msg = payload.new as Message;
-        setAllMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-      })
-      .subscribe();
+  .channel(`message-room-${roomId}`)
+  .on(
+    'postgres_changes',
+    {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'message',
+      filter: `room_id=eq.${roomId}`,  // ✅ 這行雖然寫著，但實際 filter 不生效
+    },
+    (payload) => {
+      const msg = payload.new as Message;
+      setAllMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    }
+  )
+  .subscribe();
+
 
     return () => {
       isMounted = false;
@@ -182,7 +191,7 @@ export default function ChatRoom({ roomId, playerId, players, setPlayers }: Chat
         <div className="flex-1 p-3 overflow-y-auto space-y-2" id="chat-messages">
         {filteredMessages.map((m) => {
           const sender = players.find((p) => p.id === m.sender_id);
-          const isSystemMessage = m.sender_id === SYSTEM_USER_ID;
+          const isSystemMessage = m.sender_id === null;
           const isOwnMessage = m.sender_id === playerId;
 
           let messageClass = '';

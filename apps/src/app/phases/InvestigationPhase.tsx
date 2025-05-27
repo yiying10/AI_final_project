@@ -1,27 +1,22 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { SYSTEM_USER_ID } from '../lib/config';
 import { chatWithNPC } from '../lib/chatWithNPC';
 
 interface InvestigationPhaseProps {
-  timer: number;
-  discoveredClues: string[];
-  setDiscoveredClues: React.Dispatch<React.SetStateAction<string[]>>;
   roomId: string;
   roomCode: number;
   playerId: string;
-  setCurrentPhase: React.Dispatch<React.SetStateAction<string>>;
-  setTimer: React.Dispatch<React.SetStateAction<number>>;
+  currentPhase: string;
+  setCurrentPhase: () => void;
 }
 
 const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
-  timer,
   roomId,
   roomCode,
   playerId,
+  currentPhase,
   setCurrentPhase,
-  setTimer,
 }) => {
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<{ type: 'object' | 'npc'; name: string; content?: string | null; ref?: string | null } | null>(null);
@@ -30,26 +25,15 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
   const [npcs, setNpcs] = useState<{ id: string; map_id: string; name: string; ref: string | null }[]>([]);
   const [chatDialogue, setChatDialogue] = useState<string | null>(null);
   const [inputText, setInputText] = useState<string>('');
+  const [timer, setTimer] = useState<number>(10);
 
   // 倒數計時器
   useEffect(() => {
-    setTimer(180);
     const interval = setInterval(() => {
       setTimer((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          (async () => {
-            setCurrentPhase('discussion');
-            const { error: messageError } = await supabase.from('message').insert([
-              {
-                room_id: roomId,
-                sender_id: SYSTEM_USER_ID,
-                receiver_id: null,
-                content: '蒐證階段結束，現在是討論時間',
-              },
-            ]);
-            if (messageError) console.error('發送系統訊息失敗:', messageError);
-          })();
+          setCurrentPhase();
           return 0;
         }
         return prev - 1;

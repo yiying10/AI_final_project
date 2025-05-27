@@ -1,7 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { SYSTEM_USER_ID } from '../lib/config';
 
 interface Player {
   id: string;
@@ -25,7 +24,7 @@ interface Gamerole {
 interface Props {
   playerId: string;
   roomId: string;
-  setCurrentPhase: (phase: string) => void;
+  setCurrentPhase: () => void;
 }
 
 const VotingPhase = ({ playerId, roomId, setCurrentPhase }: Props) => {
@@ -96,18 +95,7 @@ const VotingPhase = ({ playerId, roomId, setCurrentPhase }: Props) => {
         .eq('id', roomId);
 
       if (!updateError) {
-        setCurrentPhase('ended');
-        const { error: messageError } = await supabase.from('messages').insert([
-          {
-            room_id: roomId,
-            sender_id: SYSTEM_USER_ID,
-            receiver_id: null,
-            content: '投票結束，遊戲已結束。',
-          },
-        ]);
-        if (messageError) console.error('發送系統訊息失敗:', messageError);
-      } else {
-        console.error('更新房間狀態失敗:', updateError);
+        setCurrentPhase();
       }
     }
   };

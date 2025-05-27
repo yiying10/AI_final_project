@@ -9,7 +9,7 @@ interface IntroductionPhaseProps {
   playerId: string;
   isHost: boolean;
   roomCode: number;
-  setCurrentPhase: (phase: string) => void;
+  setCurrentPhase: () => void;
 }
 
 export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, setCurrentPhase }: IntroductionPhaseProps) {
@@ -21,7 +21,7 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
 
   const loadScriptFromRoom = async () => {
     const { data: roomData, error: roomError } = await supabase
-      .from('rooms')
+      .from('room')
       .select('script_id')
       .eq('id', roomId)
       .single();
@@ -29,14 +29,14 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
     if (roomError || !roomData?.script_id) return;
 
     const { data: script, error: scriptError } = await supabase
-      .from('game_scripts')
-      .select('title, background, prompt')
+      .from('gamescript')
+      .select('background, prompt')
       .eq('id', roomData.script_id)
       .single();
 
     if (scriptError || !script) return;
 
-    setStorySummary(`${script.title}\n${script.background}`);
+    setStorySummary(`${script.background}`);
     setScriptPrompt(script.prompt);
   };
 
@@ -50,7 +50,7 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'rooms',
+          table: 'room',
           filter: `id=eq.${roomId}`,
         },
         (payload) => {
@@ -111,14 +111,13 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
   
       console.log('世界資料:', worldData);
       toast.success('世界資料生成成功！');
-      
-      setCurrentPhase('role_selection');
   
     } catch (error) {
       console.error('生成世界資料失敗:', error);
       toast.error(error instanceof Error ? error.message : '生成世界資料失敗');
     }
     finally {
+      setCurrentPhase();
       setGeneratingWorld(false); // 結束 loading
     }
   };
@@ -161,6 +160,15 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
             className={`px-4 py-2 text-white rounded ${generatingBackground ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'}`}
           >
             {generatingBackground ? '生成中...' : '生成劇本'}
+          </button>
+        </div>
+      )}
+      {isHost && (
+        <div className="mt-6 bg-white border p-4 rounded shadow-inner">
+          <button
+            onClick={setCurrentPhase}
+            className={`px-4 py-2 text-white rounded ${generatingBackground ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'}`}
+          >跳過
           </button>
         </div>
       )}
