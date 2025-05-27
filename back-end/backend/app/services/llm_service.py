@@ -34,6 +34,8 @@ def call_llm_for_background(
         "當我給你一個「場景」或「主題」，請不要再問任何澄清問題，"
         "直接生成一段生動、引人入勝的故事背景，"
         "設定場景、埋伏筆、留下玩家探索的空間。"
+        "禁止出現「故事背景:」之類的標題，直接輸出內容"
+        "只能用繁體中文"
     )
 
     # 把使用者傳進來的關鍵字包成「場景：…」的格式，並指示「只回傳文字，不要格式」
@@ -68,6 +70,11 @@ async def call_llm_for_characters(
         "請根據以下故事背景，生成指定數量的角色。"
         "每個角色請以 JSON 物件回傳，包含欄位："
         "name, role, public_info, secret, mission。"
+        "所有輸出只能用繁體中文"
+        """每一位角色產生一段 `public_info`，並且：
+        1. **語氣**：全部使用第二人稱「你是…」開頭，例如「你是一位…」，帶入角色身份。  
+        2. **內容**：包含角色的背景（身份或出身）、主要性格特質、當前動機，約 1–2 句話。 """
+        "name：請**只能**填寫人物的「個人姓名」，**不要**加上任何職位、頭銜或敬稱（例如「陳院長」、「王護士長」都不行，只能寫「陳」、「王」或「陳先生」、「王女士」）。"
     )
     user = f"故事背景：{background}\n請生成 {num_characters} 位角色。"
 
@@ -124,6 +131,7 @@ async def call_llm_for_chat(
         f"遊戲背景如下：\n{background}\n\n"
         f"角色的公開資訊：{character['public_info']}。\n"
         f"角色的秘密任務是：{character['mission']}。\n\n"
+        "所有輸出只能用繁體中文"
         "請完全以此角色的身份和口吻回應玩家，並嚴格以 JSON 物件格式回傳，"
         "只包含欄位 dialogue, hint, evidence。"
     )
@@ -186,6 +194,7 @@ async def call_llm_for_chat(
 
 async def call_llm_for_npcs(
     background: str,
+    characters: Dict[str, Any],
     num_npcs: int,
     model: str = "gemini-2.0-flash",
     temperature: float = 0.7
@@ -193,6 +202,9 @@ async def call_llm_for_npcs(
     system = (
         "你是一名劇本殺編劇，根據以下故事背景生成指定數量的 NPC 角色。"
         "請以純 JSON 陣列回傳，每個元素包含 name, description 兩個欄位。"
+        "所有輸出只能用繁體中文"
+        "name：請**只能**填寫人物的「個人姓名」，**不要**加上任何職位、頭銜或敬稱（例如「陳院長」、「王護士長」都不行，只能寫「陳」、「王」或「陳先生」、「王女士」）。"
+        f"NPC角色不可以和已生成的{characters}有重複"
     )
     user = f"故事背景：{background}\\n請生成 {num_npcs} 位 NPC。"
     schema = {
@@ -237,6 +249,8 @@ async def call_llm_for_scenes_and_ending(
        f"只能用{names_str}當作角色編寫劇本"
        f"故事地點只能用：{locations}\n"
         f"故事內容融入 NPC ：{npcs}\n"
+        f"兇手不能是{characters}裡的角色也不能是{npcs}"
+        "只能用繁體中文"
        " 你是一個專業的劇本殺編劇："
         """
         1. 劇本結構：輸出一個 JSON 物件 {"acts":[...],"ending":string}，嚴格遵守格式，不要多餘文字或標記。
@@ -244,16 +258,17 @@ async def call_llm_for_scenes_and_ending(
             -**請確保所有字串內容中的特殊字元（例如雙引號本身、換行符等）都進行** **JSON 逸出 (escaped)**。例如：`"This is a \"quote\"."` 或 `"Line1\nLine2"`。
             -**所有逗號 `,` 和括號 `[]` `{}` 都必須正確配對。**
         
-        2. 解謎氛圍：
+        3. 解謎氛圍：
         - 每幕至少隱藏 1–2 個「關鍵線索」，以及 1 個「迷惑線索」（red herring），不要用括號或標籤標示，只要以銜接語直接寫進敘事中。
         - 線索形式可以是：書信暗號、拼圖碎片、對話暗示等，並在文本中給出簡要解謎提示。
-        3. 角色動機：
+        4. 角色動機：
         - 每個角色腳本中要包含一句「隱藏動機」，增加討論衝突，一樣不要用括號或標籤標示，只要以銜接語直接寫進敘事中。。
-        4. 漸進揭露：
+        5. 漸進揭露：
         - 幕與幕之間要有連貫性：第一幕揭開事件冰山一角，第二幕拼湊部分真相，第三幕提供最後兇手線索。
-        5. 每幕腳本長度：
+        6. 每幕腳本長度：
+        -“dialogue” 中 **禁止** 出现“我是李明”之類的自我介紹句子；請直接以角色的語氣進入對話。
         - 每個角色在每幕的專屬劇本 100–200 字，保證足夠細節。
-        6. 嵌入謎題：
+        7. 嵌入謎題：
         - 部分線索請以「謎題」形式出現（例如：『密碼是屋頂牌匾上的三個字母』），讓玩家必須解題才能進入下一步。
         """
     )
@@ -355,6 +370,7 @@ async def call_llm_for_locations(
         " 3) npcs (整數陣列，對應 NPC 的 id)、"
         " 4) objects (物件陣列，每個物件要有 id, name, lock(boolean), clue(string或null), owner_id(integer, 預設為null))。"
         "務必只回傳純 JSON 陣列，不要多任何說明文字。"
+        "只能用繁體中文"
     )
     user = (
         f"故事背景：{background}\n"

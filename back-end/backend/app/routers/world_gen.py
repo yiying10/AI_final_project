@@ -79,6 +79,7 @@ async def generate_full_content(req: WorldGenRequest):
     # 生成 NPC
     raw_npcs = await call_llm_for_npcs(
         background=background,
+        characters=[{"name": c["name"]} for c in raw_chars],
         num_npcs=req.num_npcs,
         model=req.model,
         temperature=req.temperature,

@@ -12,6 +12,13 @@ basedir = os.path.dirname(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, '..', '.env'))
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # 或 ["*"]，若你測試階段可開放所有
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event('startup')
 async def on_startup():
