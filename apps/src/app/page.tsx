@@ -211,6 +211,13 @@ export default function HomePage() {
         return;
       }
 
+      if (roomErr || room.status != 'waiting' && room.status != 'introduction') {
+        toast.error('此房間已開始遊戲，請尋找其他房間');
+        alert('此房間已開始遊戲，請尋找其他房間');
+        setJoinCode('');
+        return;
+      }
+
       // 檢查房間是否已滿
       const { count: playerCount } = await supabase
         .from('player')
@@ -270,45 +277,52 @@ export default function HomePage() {
   }
 
   return (
-    <main className="max-w-md mx-auto p-6 space-y-8">
-      <h1 className="text-3xl font-bold text-center">劇本殺遊戲</h1>
-      <p className="text-center text-gray-500">預設暱稱：{userCode}</p>
+    <main className="max-w-md mx-auto p-6 space-y-6 bg-white rounded-xl shadow-md border border-gray-200">
+      <div className="space-y-2 text-center">
+        <h1 className="text-3xl font-bold text-indigo-700">AI劇本殺遊戲</h1>
+        <p className="text-gray-500">預設暱稱：<span className="font-medium text-gray-700">{userCode}</span></p>
+      </div>
 
-      <input
-        type="text"
-        placeholder="輸入暱稱（可選）"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-full border border-gray-300 rounded px-3 py-2"
-      />
+      <div className="space-y-2">
+        <label className="text-sm font-semibold text-gray-700">自訂暱稱（可選）</label>
+        <input
+          type="text"
+          placeholder="輸入暱稱"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-300"
+        />
+      </div>
 
-      {/* 創房按鈕 */}
       <button
         disabled={creating}
         onClick={createRoom}
-        className="w-full py-3 bg-blue-600 text-white rounded disabled:opacity-50"
+        className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
       >
         {creating ? '創建中...' : '創立新房間'}
       </button>
 
-      {/* 加入房間輸入 */}
-      <div className="flex space-x-2">
-        <input
-          type="text"
-          placeholder="輸入房間代碼"
-          value={joinCode}
-          onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-          className="flex-grow border border-gray-300 rounded px-3 py-2 uppercase tracking-widest"
-          maxLength={6}
-        />
-        <button
-          disabled={joining}
-          onClick={joinRoom}
-          className="px-4 bg-green-600 text-white rounded disabled:opacity-50"
-        >
-          {joining ? '加入中...' : '加入房間'}
-        </button>
+      <div className="space-y-2">
+        <label className="text-sm font-semibold text-gray-700">加入房間</label>
+        <div className="flex space-x-2">
+          <input
+            type="text"
+            placeholder="輸入房間代碼"
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+            className="flex-grow border border-gray-300 rounded-lg px-3 py-2 uppercase tracking-widest focus:ring-2 focus:ring-green-300"
+            maxLength={6}
+          />
+          <button
+            disabled={joining}
+            onClick={joinRoom}
+            className="px-4 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+          >
+            {joining ? '加入中...' : '加入房間'}
+          </button>
+        </div>
       </div>
     </main>
+
   );
 }

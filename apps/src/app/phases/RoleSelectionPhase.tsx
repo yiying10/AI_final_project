@@ -140,7 +140,7 @@ export default function RoleSelectionPhase({
 
     const { error: updateError } = await supabase
       .from('player')
-      .update({ role_id: game_role.id })
+      .update({ role_id: game_role.id, name: game_role.name,})
       .eq('id', playerId);
 
     if (updateError) {
@@ -175,57 +175,62 @@ export default function RoleSelectionPhase({
     }
   };
 
-  return (
-    <div className="bg-gray-50 p-4 rounded-lg border">
-      <h3 className="text-xl font-bold mb-3">角色選擇階段</h3>
+return (
+  <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 space-y-6">
+    <h3 className="text-2xl font-bold text-indigo-700">角色選擇階段</h3>
 
-      {!playerInfo ? (
-        <>
-          <p className="mb-4">請選擇你的角色。</p>
-          <div className="grid grid-cols-2 gap-4">
-            {characters.map((game_role) => {
-              const isTaken = selectedRoles.includes(game_role.id);
-              return (
-                <button
-                  key={game_role.id}
-                  disabled={isTaken}
-                  className={`p-4 rounded border ${
-                    isTaken
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-50 hover:bg-blue-100'
-                  }`}
-                  onClick={() => handleSelectCharacter(game_role)}
-                >
-                  <h4 className="font-semibold">{game_role.name}</h4>
-                  <p className="text-sm text-gray-600">{game_role.public_info}</p>
-                  {isTaken && <p className="text-red-500 mt-2">已被選擇</p>}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      ) : (
-        <div className="mt-6">
-          <h4 className="font-semibold mb-2">你的角色：{playerInfo.name}</h4>
-          <div className="bg-blue-50 p-3 rounded border border-blue-100">
-            <p><span className="font-medium">公開信息：</span>{playerInfo.public_info}</p>
-            {playerInfo.secret && <p className="mt-2"><span className="font-medium text-red-600">秘密：</span>{playerInfo.secret}</p>}
-            {playerInfo.mission && <p className="mt-2"><span className="font-medium text-green-600">任務：</span>{playerInfo.mission}</p>}
-          </div>
+    {!playerInfo ? (
+      <>
+        <p className="text-gray-700">請選擇你的角色。</p>
+        <div className="grid grid-cols-2 gap-4">
+          {characters.map((game_role) => {
+            const isTaken = selectedRoles.includes(game_role.id);
+            return (
+              <button
+                key={game_role.id}
+                disabled={isTaken}
+                className={`p-4 rounded-lg border transition ${
+                  isTaken
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-indigo-50 hover:bg-indigo-100'
+                }`}
+                onClick={() => handleSelectCharacter(game_role)}
+              >
+                <h4 className="font-semibold text-indigo-700">{game_role.name}</h4>
+                <p className="text-sm text-gray-600">{game_role.public_info}</p>
+                {isTaken && <p className="text-xs text-red-500 mt-2">已被選擇</p>}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </>
+    ) : (
+      <div>
+        <h4 className="font-semibold text-indigo-700 mb-2">你的角色是：{playerInfo.name}</h4>
+        <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200 space-y-2">
+          <p><span className="font-medium text-gray-700">公開信息：</span>{playerInfo.public_info}</p>
+          {playerInfo.secret && (
+            <p><span className="font-medium text-red-600">秘密：</span>{playerInfo.secret}</p>
+          )}
+          {playerInfo.mission && (
+            <p><span className="font-medium text-green-600">任務：</span>{playerInfo.mission}</p>
+          )}
+        </div>
+      </div>
+    )}
 
-      {isHost && allSelected && (
-        <div className="mt-6 text-center">
-          <button
-            className="mt-4 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-            onClick={() => setCurrentPhase()}
-          >
-            下一步
-          </button>
-        </div>
-      )}
-      {isHost && (
+    {isHost && allSelected && (
+      <div className="text-center">
+        <button
+          className="w-full py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
+          onClick={() => setCurrentPhase()}
+        >
+          全員角色選擇完畢！下一步
+        </button>
+      </div>
+    )}
+    {/* debug用 */}
+    {isHost && (
         <div className="mt-6 text-center">
           <button
             className="mt-4 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
@@ -235,6 +240,5 @@ export default function RoleSelectionPhase({
           </button>
         </div>
       )}
-    </div>
-  );
-}
+  </div>
+);}

@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useSyncedTimer } from '../lib/useSyncedTimer';
 
 interface DiscussionPhaseProps {
   roomId: string;
   currentPhase: string;
+  isHost: boolean;
   setCurrentPhase: () => void;
 }
 
@@ -13,33 +14,16 @@ export default function DiscussionPhase({
   roomId,
   currentPhase,
   setCurrentPhase,
+  isHost
 }: DiscussionPhaseProps) {
-  const [isTimerStarted, setIsTimerStarted] = useState(false);
-  const [timer, setTimer] = useState<number>(10); // 初始倒計時為10秒
-  useEffect(() => {
-    if ((currentPhase === 'discussion1' || currentPhase === 'discussion2') && !isTimerStarted) {
-      setIsTimerStarted(true);
-
-      const interval = setInterval(() => {
-        setTimer((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            setCurrentPhase();
-
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [currentPhase, isTimerStarted, roomId, setTimer, setCurrentPhase]);
-
-  // reset 計時器狀態當 phase 改變時
-  useEffect(() => {
-    setIsTimerStarted(false);
-  }, [currentPhase]);
+  
+  const timer = useSyncedTimer({
+    roomId,
+    phase: currentPhase,
+    isHost,
+    duration: 10, //TODO: 300 
+    onTimerEnd: () => setCurrentPhase(), // 房主結束時切換
+  });
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 space-y-4">

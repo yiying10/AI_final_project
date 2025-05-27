@@ -138,6 +138,14 @@ const DialoguePhase = ({ roomId, playerId, isHost, setCurrentPhase, currentPhase
   ) : (
     <p className="text-gray-500">載入角色資料中...</p>
   )}
+  {/* debug用 */}
+  {isHost &&(
+        <button
+          className="mt-6 w-full bg-indigo-600 text-white font-semibold py-2 rounded-lg hover:bg-indigo-700 transition"
+          onClick={setCurrentPhase}>
+          跳過
+        </button>
+      )}
 </div>
 
   );

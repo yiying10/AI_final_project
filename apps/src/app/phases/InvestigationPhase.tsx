@@ -2,18 +2,21 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { chatWithNPC } from '../lib/chatWithNPC';
+import { useSyncedTimer } from '../lib/useSyncedTimer';
 
 interface InvestigationPhaseProps {
   roomId: string;
   roomCode: number;
   playerId: string;
   currentPhase: string;
+  isHost: boolean;
   setCurrentPhase: () => void;
 }
 
 const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
   roomId,
   roomCode,
+  isHost,
   playerId,
   currentPhase,
   setCurrentPhase,
@@ -25,22 +28,14 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
   const [npcs, setNpcs] = useState<{ id: string; map_id: string; name: string; ref: string | null }[]>([]);
   const [chatDialogue, setChatDialogue] = useState<string | null>(null);
   const [inputText, setInputText] = useState<string>('');
-  const [timer, setTimer] = useState<number>(10);
 
-  // 倒數計時器
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setCurrentPhase();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [roomId]);
+  const timer = useSyncedTimer({
+    roomId,
+    phase: currentPhase,
+    isHost,
+    duration: 10, //TODO: 210秒
+    onTimerEnd: () => setCurrentPhase(), // 房主結束時切換
+  });
 
   // 取得資料
   useEffect(() => {
@@ -80,85 +75,92 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
   };
 
   return (
-    <div className="bg-gray-50 p-4 rounded-lg border">
-      <div className="mb-4 text-right text-lg font-bold text-red-600">倒計時：{timer} 秒</div>
-      <div>
-        <h3 className="text-xl font-bold mb-3">地圖</h3>
-
-        {!selectedLocation && (
+    <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 space-y-4">
+      <div className="flex justify-end">
+        <div className="text-lg font-semibold text-red-600">
+          倒計時：{timer} 秒
+        </div>
+      </div>
+  
+      <h3 className="text-2xl font-bold text-indigo-700">地圖探索</h3>
+  
+      {!selectedLocation && (
+        <div className="grid grid-cols-2 gap-4">
+          {locations.map((loc) => (
+            <div
+              key={loc.id}
+              onClick={() => setSelectedLocation(loc.id)}
+              className="p-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg cursor-pointer text-indigo-800 font-semibold text-center"
+            >
+              {loc.name}
+            </div>
+          ))}
+        </div>
+      )}
+  
+      {selectedLocation !== null && !selectedDetail && (
+        <div className="space-y-4">
+          <button onClick={() => setSelectedLocation(null)} className="text-sm text-blue-600 underline">
+            ← 返回地圖
+          </button>
+          <h4 className="text-xl font-bold text-indigo-700">
+            {locations.find((l) => l.id === selectedLocation)?.name}
+          </h4>
+  
           <div className="grid grid-cols-2 gap-4">
-            {locations.map((loc) => (
+            {objects.filter((o) => o.map_id === selectedLocation).map((obj) => (
               <div
-                key={loc.id}
-                onClick={() => setSelectedLocation(loc.id)}
-                className="p-4 bg-indigo-100 rounded hover:bg-indigo-200 cursor-pointer"
+                key={`obj-${obj.id}`}
+                onClick={() => setSelectedDetail({ type: 'object', name: obj.name, content: obj.content })}
+                className="p-4 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg cursor-pointer text-green-800 font-semibold text-center"
               >
-                {loc.name}
+                {obj.name}
+              </div>
+            ))}
+            {npcs.filter((n) => n.map_id === selectedLocation).map((npc) => (
+              <div
+                key={`npc-${npc.id}`}
+                onClick={() => setSelectedDetail({ type: 'npc', name: npc.name, ref: npc.ref })}
+                className="p-4 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg cursor-pointer text-yellow-800 font-semibold text-center"
+              >
+                {npc.name}
               </div>
             ))}
           </div>
-        )}
-
-        {selectedLocation !== null && !selectedDetail && (
-          <div>
-            <button onClick={() => setSelectedLocation(null)} className="text-sm text-blue-600 underline mb-2">返回地圖</button>
-            <h4 className="text-lg font-bold mb-2">{locations.find((l) => l.id === selectedLocation)?.name}</h4>
-
-            <div className="grid grid-cols-2 gap-4">
-              {objects.filter((o) => o.map_id === selectedLocation).map((obj) => (
-                <div
-                  key={`obj-${obj.id}`}
-                  onClick={() => setSelectedDetail({ type: 'object', name: obj.name, content: obj.content })}
-                  className="p-4 bg-green-100 rounded hover:bg-green-200 cursor-pointer"
-                >
-                  {obj.name}
-                </div>
-              ))}
-              {npcs.filter((n) => n.map_id === selectedLocation).map((npc) => (
-                <div
-                  key={`npc-${npc.id}`}
-                  onClick={() => setSelectedDetail({ type: 'npc', name: npc.name, ref: npc.ref })}
-                  className="p-4 bg-yellow-100 rounded hover:bg-yellow-200 cursor-pointer"
-                >
-                  {npc.name}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {selectedDetail && (
-          <div>
-            <button onClick={() => setSelectedDetail(null)} className="text-sm text-blue-600 underline mb-2">
-              返回 {locations.find((l) => l.id === selectedLocation)?.name}
+        </div>
+      )}
+  
+      {selectedDetail && (
+        <div className="space-y-4">
+          <button onClick={() => setSelectedDetail(null)} className="text-sm text-blue-600 underline">
+            ← 返回 {locations.find((l) => l.id === selectedLocation)?.name}
+          </button>
+          <h4 className="text-xl font-bold text-indigo-700">{selectedDetail.name} 的內容</h4>
+          <p className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-gray-800">
+            {selectedDetail.type === 'object' ? selectedDetail.content || '無更多資訊' : selectedDetail.ref || '這是 NPC，你可以開始互動！'}
+          </p>
+          {selectedDetail.type === 'npc' && (
+            <button
+              onClick={() => handleTalk(npcs.find((n) => n.name === selectedDetail.name)?.id || '')}
+              className="py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              與 {selectedDetail.name} 對話
             </button>
-            <h4 className="text-lg font-bold mb-2">{selectedDetail.name} 的內容</h4>
-            <p className="bg-white p-2 rounded border">
-              {selectedDetail.type === 'object' ? selectedDetail.content || '無更多資訊' : selectedDetail.ref || '這是 NPC，你可以開始互動！'}
-            </p>
-            {selectedDetail.type === 'npc' && (
-              <button
-                onClick={() => handleTalk(npcs.find((n) => n.name === selectedDetail.name)?.id || '')}
-                className="mt-2 p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                與 {selectedDetail.name} 對話
-              </button>
-            )}
-          </div>
-        )}
-
-        {chatDialogue && (
-          <div className="mt-4 p-4 bg-gray-100 rounded border">
-            <h4 className="text-lg font-bold mb-2">NPC 對話</h4>
-            <p>{chatDialogue}</p>
-            <button onClick={() => setChatDialogue(null)} className="mt-2 text-sm text-blue-600 underline">
-              關閉對話
-            </button>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
+  
+      {chatDialogue && (
+        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+          <h4 className="text-lg font-bold text-indigo-700">NPC 對話</h4>
+          <p className="text-gray-800">{chatDialogue}</p>
+          <button onClick={() => setChatDialogue(null)} className="text-sm text-blue-600 underline">
+            關閉對話
+          </button>
+        </div>
+      )}
     </div>
-  );
+  );  
 };
 
 export default InvestigationPhase;

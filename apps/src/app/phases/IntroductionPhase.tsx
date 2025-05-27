@@ -41,6 +41,23 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
   };
 
   useEffect(() => {
+    const channel = supabase.channel('background-broadcast')
+      .on('broadcast', { event: 'background' }, (payload) => {
+        const { prompt, background } = payload.payload;
+        setScriptPrompt(prompt);
+        setStorySummary(background);
+        console.log('收到背景廣播:', prompt, background);
+      })
+      .subscribe();
+  
+    return () => {
+      // 執行時不需要 return Promise
+      supabase.removeChannel(channel);
+    };
+  }, []);
+  
+
+  useEffect(() => {
     loadScriptFromRoom();
 
     const subscription = supabase
@@ -66,7 +83,7 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
       supabase.removeChannel(subscription);
     };
   }, [roomId]);
-
+  
   const handleGenerateBackground = async () => {
     if (!prompt.trim()) {
       toast.error('請輸入有效的提示詞');
@@ -77,6 +94,15 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
     setGeneratingBackground(true);
     try {
       const newBackground = await backgroundGenerator(roomCode, prompt);
+      await supabase.channel('background-broadcast')
+      .send({
+        type: 'broadcast',
+        event: 'background',
+        payload: {
+          prompt,
+          background: newBackground,
+        },
+      });
       if (!newBackground) throw new Error('生成劇本失敗：未返回背景數據');
   
       setStorySummary(newBackground);  // 暫存背景
@@ -131,8 +157,12 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
         歡迎來到劇本殺推理遊戲！你即將與其他玩家一同體驗一段懸疑刺激的故事。每位玩家將扮演一位角色，
         根據劇情中的線索與對話，找出真相，揭開事件背後的謎團。
       </p>
+      <br></br>
+      <p><b>遊戲流程</b></p>
+      <p>生成劇情 » 選擇角色 » 閱讀劇本 » 現場蒐證 » 第一次討論 » 閱讀劇本 » 現場蒐證 » 第二次討論 » 找出兇手 » 公佈答案</p>
+      <br></br>
       <p className="mb-4 text-gray-700">
-        接下來房主將進入角色選擇階段，請準備好接受你即將扮演的身份！
+        接下來由房主輸入劇本關鍵字，請準備好接受你即將扮演的身份！
       </p>
 
       {scriptPrompt && storySummary && (
@@ -163,6 +193,7 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
           </button>
         </div>
       )}
+      {/* debug用 */}
       {isHost && (
         <div className="mt-6 bg-white border p-4 rounded shadow-inner">
           <button

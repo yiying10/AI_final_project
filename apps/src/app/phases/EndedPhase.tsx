@@ -9,9 +9,13 @@ interface EndedPhaseProps {
 
 export default function EndedPhase({ roomId }: EndedPhaseProps) {
   const [answer, setAnswer] = useState<string | null>(null);
+  const [voteCounts, setVoteCounts] = useState<Record<string, number>>({});
+  const [mostVotedPlayer, setMostVotedPlayer] = useState<string | null>(null);
+  const [playerMap, setPlayerMap] = useState<Record<string, string>>({}); // player.id -> player.name
 
   useEffect(() => {
-    const fetchAnswer = async () => {
+    const fetchData = async () => {
+      // 1️⃣ 取得房間解答
       const { data: roomData, error: roomError } = await supabase
         .from('room')
         .select('script_id')
@@ -35,21 +39,83 @@ export default function EndedPhase({ roomId }: EndedPhaseProps) {
       }
 
       setAnswer(scriptData?.answer || '未設定解答');
+
+      // 2️⃣ 取得投票資料
+      const { data: votes, error: votesError } = await supabase
+        .from('vote')
+        .select('voter_id, voted_id')
+        .eq('room_id', roomId);
+
+      if (votesError) {
+        console.error('讀取投票資料失敗:', votesError);
+        return;
+      }
+
+      // 統計票數
+      const countMap: Record<string, number> = {};
+      votes.forEach((vote) => {
+        if (vote.voted_id) {
+          countMap[vote.voted_id] = (countMap[vote.voted_id] || 0) + 1;
+        }
+      });
+      setVoteCounts(countMap);
+
+      // 3️⃣ 找出票數最多的玩家
+      let maxVotes = 0;
+      let topPlayerId = null;
+      for (const [playerId, count] of Object.entries(countMap)) {
+        if (count > maxVotes) {
+          maxVotes = count;
+          topPlayerId = playerId;
+        }
+      }
+      setMostVotedPlayer(topPlayerId);
+
+      // 4️⃣ 取得玩家名稱映射
+      const { data: players, error: playersError } = await supabase
+        .from('player')
+        .select('id, name')
+        .eq('room_id', roomId);
+
+      if (playersError) {
+        console.error('讀取玩家資料失敗:', playersError);
+        return;
+      }
+
+      const map: Record<string, string> = {};
+      players.forEach((p) => (map[p.id] = p.name));
+      setPlayerMap(map);
     };
 
-    fetchAnswer();
+    fetchData();
   }, [roomId]);
 
   return (
-    <div className="bg-gray-100 px-3 py-2 rounded mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <h2>還原真相</h2>
-        <p>{answer || '載入中...'}</p>
+    <div className="bg-white px-4 py-4 rounded-xl shadow-md border border-gray-200 space-y-4">
+      <h2 className="text-xl font-bold text-indigo-700">投票結果</h2>
+      {mostVotedPlayer ? (
+        <p className="text-gray-800">
+          大家認為的兇手是：<span className="font-bold text-red-600">{playerMap[mostVotedPlayer]}</span>！
+        </p>
+      ) : (
+        <p className="text-gray-600">無投票結果。</p>
+      )}
+
+      <h2 className="text-xl font-bold text-indigo-700">還原真相</h2>
+      <p className="text-gray-800">{answer || '載入中...'}</p>
+
+      <div className="space-y-1 text-gray-700">
+        {Object.entries(voteCounts).map(([playerId, count]) => (
+          <p key={playerId}>
+            {playerMap[playerId]}：<span className="font-semibold">{count} 票</span>
+          </p>
+        ))}
       </div>
-      <div>
-        <h2>遊戲結束</h2>
-        <p>感謝您的參與！</p>
-      </div>
+
+      <hr className="border-gray-300" />
+
+      <h2 className="text-xl font-bold text-indigo-700">遊戲結束</h2>
+      <p className="text-gray-700">感謝您的參與！</p>
     </div>
   );
 }

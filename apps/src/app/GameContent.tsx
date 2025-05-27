@@ -187,6 +187,7 @@ export default function GameContent({
       case 'investigation1':
         return <InvestigationPhase
           roomId={roomId}
+          isHost={isHost}
           roomCode={roomCode}
           playerId={playerId}
           currentPhase={currentPhase}
@@ -195,6 +196,7 @@ export default function GameContent({
 
       case 'discussion1':
         return <DiscussionPhase 
+        isHost={isHost}
         roomId={roomId}
         currentPhase={currentPhase}
         setCurrentPhase={goToNextPhase} // 使用通用函式
@@ -213,6 +215,7 @@ export default function GameContent({
         case 'investigation2':
           return <InvestigationPhase
             roomId={roomId}
+            isHost={isHost}
             roomCode={roomCode}
             playerId={playerId}
             currentPhase={currentPhase}
@@ -221,6 +224,7 @@ export default function GameContent({
   
         case 'discussion2':
           return <DiscussionPhase 
+          isHost={isHost}
           roomId={roomId}
           currentPhase={currentPhase}
           setCurrentPhase={goToNextPhase} // 使用通用函式
@@ -236,7 +240,8 @@ export default function GameContent({
         );
 
       case 'ended':
-        return <EndedPhase />;
+        return <EndedPhase
+        roomId={roomId} />;
 
       default:
         return <DefaultPhase />;

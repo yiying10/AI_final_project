@@ -101,15 +101,16 @@ const VotingPhase = ({ playerId, roomId, setCurrentPhase }: Props) => {
   };
 
   return (
-    <div className="bg-gray-50 p-4 rounded-lg border">
-      <h3 className="text-xl font-bold mb-3">投票階段</h3>
-      <p className="mb-4">根據討論結果，投票選出你認為的兇手。</p>
-      <ul className="mb-4">
+    <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 space-y-4">
+      <h3 className="text-2xl font-bold text-indigo-700">投票階段</h3>
+      <p className="text-gray-700">根據討論結果，投票選出你認為的兇手。</p>
+  
+      <ul className="space-y-2">
         {players.map((player) => (
-          <li key={player.id} className="mb-2">
+          <li key={player.id}>
             <button
               onClick={() => handleVote(player.id)}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="w-full py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
               disabled={!!votes[playerId]}
             >
               投票給 {roleMap[player.role_id] || '未知角色'}
@@ -119,16 +120,19 @@ const VotingPhase = ({ playerId, roomId, setCurrentPhase }: Props) => {
         <li>
           <button
             onClick={() => handleVote(null)}
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            className="w-full py-2 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600 transition disabled:opacity-50"
             disabled={!!votes[playerId]}
           >
             棄票
           </button>
         </li>
       </ul>
-      {votes[playerId] && <p className="text-green-600">你已完成投票。</p>}
+  
+      {votes[playerId] && (
+        <p className="text-green-600 font-semibold text-center">你已完成投票</p>
+      )}
     </div>
-  );
+  );   
 };
 
 export default VotingPhase;
