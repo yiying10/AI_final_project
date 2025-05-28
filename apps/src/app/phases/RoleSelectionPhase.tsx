@@ -120,60 +120,68 @@ export default function RoleSelectionPhase({
 
   const handleSelectCharacter = async (game_role: GameRole) => {
     if (selectedRoles.includes(game_role.id)) return;
-
+  
+    // 確認角色是否已被選取
     const { data: existing, error: checkError } = await supabase
       .from('player')
       .select('id')
       .eq('room_id', roomId)
       .eq('role_id', game_role.id)
       .maybeSingle();
-
+  
     if (checkError) {
       console.error('檢查角色是否已被選取失敗：', checkError);
       return;
     }
-
+  
     if (existing) {
       alert('該角色已被其他玩家選取，請選擇其他角色');
       return;
     }
-
-    const { error: updateError } = await supabase
-      .from('player')
-      .update({ role_id: game_role.id, name: game_role.name,})
-      .eq('id', playerId);
-
-    if (updateError) {
-      console.error('角色更新失敗：', updateError);
-      return;
-    }
-
-    setPlayerInfo(game_role);
-
+  
+    // 先查目前玩家名稱 (暱稱)
     const { data: player, error: fetchError } = await supabase
       .from('player')
       .select('name')
       .eq('id', playerId)
       .single();
-
+  
     if (fetchError) {
       console.error('查詢玩家名稱失敗:', fetchError);
       return;
     }
-
+  
+    const playerName = player?.name || '玩家';
+  
+    // 傳送訊息
     const { error: messageError } = await supabase.from('message').insert([
       {
         room_id: roomId,
         sender_id: null,
         receiver_id: null,
-        content: `${player?.name} 已選擇角色 ${game_role.name}`,
+        content: `${playerName} 已選擇角色 ${game_role.name}`,
       },
     ]);
-
+  
     if (messageError) {
       console.error('發送系統訊息失敗：', messageError);
     }
+  
+    // 更新 player 名字為角色名字 + 更新角色ID
+    const { error: updateError } = await supabase
+      .from('player')
+      .update({ role_id: game_role.id, name: game_role.name })
+      .eq('id', playerId);
+  
+    if (updateError) {
+      console.error('角色更新失敗：', updateError);
+      return;
+    }
+  
+    // 更新 local state
+    setPlayerInfo(game_role);
   };
+  
 
 return (
   <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 space-y-6">
@@ -230,7 +238,7 @@ return (
       </div>
     )}
     {/* debug用 */}
-    {isHost && (
+    {/* {isHost && (
         <div className="mt-6 text-center">
           <button
             className="mt-4 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
@@ -239,6 +247,6 @@ return (
             跳過
           </button>
         </div>
-      )}
+      )} */}
   </div>
 );}

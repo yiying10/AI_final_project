@@ -26,14 +26,14 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [objects, setObjects] = useState<{ id: string; map_id: string; name: string; content: string | null }[]>([]);
   const [npcs, setNpcs] = useState<{ id: string; map_id: string; name: string; ref: string | null }[]>([]);
-  const [chatDialogue, setChatDialogue] = useState<string | null>(null);
+  const [chatDialogues, setChatDialogues] = useState<{ [npcId: string]: string }>({});
   const [inputText, setInputText] = useState<string>('');
 
   const timer = useSyncedTimer({
     roomId,
     phase: currentPhase,
     isHost,
-    duration: 10, //TODO: 210秒
+    duration: 90, //TODO: 210秒
     onTimerEnd: () => setCurrentPhase(), // 房主結束時切換
   });
 
@@ -60,17 +60,111 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
 
   const handleTalk = async (npcId: string) => {
     try {
-      const response = await chatWithNPC(roomCode, playerId, npcId, {
-        text: 'inputText',
+      // 獲取遊戲資料
+      const { data: roomData, error: roomError } = await supabase
+        .from('room')
+        .select('script_id')
+        .eq('id', roomId)
+        .single();
+  
+      if (roomError || !roomData?.script_id) {
+        console.error('無法獲取遊戲 ID:', roomError);
+        setChatDialogues((prev) => ({
+          ...prev,
+          [npcId]: '系統錯誤，無法獲取遊戲資訊'
+        }));
+        return;
+      }
+  
+      // 獲取遊戲背景
+      const { data: scriptData, error: scriptError } = await supabase
+        .from('script')
+        .select('background')
+        .eq('id', roomData.script_id)
+        .single();
+  
+      // 獲取玩家角色資訊
+      const { data: playerData, error: playerError } = await supabase
+        .from('player')
+        .select('character_id')
+        .eq('id', playerId)
+        .single();
+  
+      let playerCharacter = null;
+      if (playerData?.character_id) {
+        const { data: characterData, error: characterError } = await supabase
+          .from('character')
+          .select('name, role, public_info, secret, mission')
+          .eq('id', playerData.character_id)
+          .single();
+  
+        if (!characterError && characterData) {
+          playerCharacter = characterData;
+        }
+      }
+  
+      console.log('獲取的玩家角色資訊:', playerCharacter);
+  
+      // 獲取 NPC 詳細資訊
+      const npc = npcs.find(n => n.id === npcId);
+      if (!npc) {
+        setChatDialogues((prev) => ({
+          ...prev,
+          [npcId]: '找不到 NPC 資訊'
+        }));
+        return;
+      }
+  
+      // 準備玩家角色資訊
+      const playerInfo = playerCharacter ? {
+        name: playerCharacter.name,
+        role: playerCharacter.role,
+        public_info: playerCharacter.public_info,
+        secret: playerCharacter.secret,
+        mission: playerCharacter.mission
+      } : {
+        name: "玩家",
+        role: "調查者",
+        public_info: "一個正在調查真相的人",
+        secret: "想要找出事件的真相",
+        mission: "收集線索並解開謎團"
+      };
+  
+      // 發送對話請求
+      const response = await chatWithNPC(roomData.script_id, playerId, npcId, {
+        text: inputText,
+        background: scriptData?.background || '這是一個推理遊戲',
+        npc_info: {
+          name: npc.name,
+          description: npc.ref || '一個神秘的角色'
+        },
+        player_info: playerInfo,
+        chat_history: []
       });
-
-      console.log('NPC 對話:', response.dialogue);
-      setChatDialogue(response.dialogue || 'NPC 沒有回應');
+  
+      // 儲存每個 NPC 對話紀錄
+      setChatDialogues((prev) => ({
+        ...prev,
+        [npcId]: response.dialogue || 'NPC 沒有回應'
+      }));
+  
       if (response.hint) console.log('NPC 線索:', response.hint);
       if (response.evidence) console.log('NPC 提供證據:', response.evidence);
+  
+      setInputText('');
     } catch (err) {
       console.error('對話失敗:', err);
-      setChatDialogue('對話失敗，請稍後再試');
+      setChatDialogues((prev) => ({
+        ...prev,
+        [npcId]: `對話失敗: ${err instanceof Error ? err.message : '未知錯誤'}`
+      }));
+    }
+  };
+  
+  const handleNPCClick = (npc: { id: string; name: string; ref: string | null }) => {
+    const confirmTalk = window.confirm(`是否要與 ${npc.name} 對話？`);
+    if (confirmTalk) {
+      setSelectedDetail({ type: 'npc', name: npc.name, ref: npc.ref });
     }
   };
 
@@ -120,7 +214,7 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
             {npcs.filter((n) => n.map_id === selectedLocation).map((npc) => (
               <div
                 key={`npc-${npc.id}`}
-                onClick={() => setSelectedDetail({ type: 'npc', name: npc.name, ref: npc.ref })}
+                onClick={() => handleNPCClick(npc)}
                 className="p-4 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg cursor-pointer text-yellow-800 font-semibold text-center"
               >
                 {npc.name}
@@ -135,28 +229,44 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
           <button onClick={() => setSelectedDetail(null)} className="text-sm text-blue-600 underline">
             ← 返回 {locations.find((l) => l.id === selectedLocation)?.name}
           </button>
-          <h4 className="text-xl font-bold text-indigo-700">{selectedDetail.name} 的內容</h4>
+          {selectedDetail.type === 'object' && <h4 className="text-xl font-bold text-indigo-700">{selectedDetail.name} 的內容</h4>}
+          {selectedDetail.type === 'object' && 
           <p className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-gray-800">
             {selectedDetail.type === 'object' ? selectedDetail.content || '無更多資訊' : selectedDetail.ref || '這是 NPC，你可以開始互動！'}
           </p>
+          }
           {selectedDetail.type === 'npc' && (
-            <button
-              onClick={() => handleTalk(npcs.find((n) => n.name === selectedDetail.name)?.id || '')}
-              className="py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              與 {selectedDetail.name} 對話
-            </button>
+            <div className="space-y-2">
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                <h4 className="text-lg font-bold text-indigo-700">{selectedDetail.name}</h4>
+                <p className="text-gray-800">
+                  {chatDialogues[npcs.find((n) => n.name === selectedDetail.name)?.id || ''] || '這是 NPC，你可以開始互動！'}
+                </p>
+
+              </div>
+              <textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                rows={3}
+                className="w-full border border-gray-300 rounded p-2"
+                placeholder={`對 ${selectedDetail.name} 說些什麼...`}
+              />
+              <button
+                onClick={() => {
+                  const npcId = npcs.find((n) => n.name === selectedDetail.name)?.id || '';
+                  if (inputText.trim()) {
+                    handleTalk(npcId);
+                  } else {
+                    alert("請輸入對話內容！");
+                  }
+                }}
+                className="py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                送出
+              </button>
+            </div>
           )}
-        </div>
-      )}
-  
-      {chatDialogue && (
-        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
-          <h4 className="text-lg font-bold text-indigo-700">NPC 對話</h4>
-          <p className="text-gray-800">{chatDialogue}</p>
-          <button onClick={() => setChatDialogue(null)} className="text-sm text-blue-600 underline">
-            關閉對話
-          </button>
+
         </div>
       )}
     </div>

@@ -194,7 +194,7 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
         </div>
       )}
       {/* debug用 */}
-      {isHost && (
+      {/* {isHost && (
         <div className="mt-6 bg-white border p-4 rounded shadow-inner">
           <button
             onClick={setCurrentPhase}
@@ -202,7 +202,7 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
           >跳過
           </button>
         </div>
-      )}
+      )} */}
 
       {isHost && storySummary && (
         <div className="mt-6">

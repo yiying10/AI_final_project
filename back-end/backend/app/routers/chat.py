@@ -1,88 +1,104 @@
-# back-end/backend/app/routers/chat.py
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from sqlmodel import Session
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-from ..database import get_session
-from ..models import Game, Player, Npc
-from ..services.memory_services import MemoryService
 from ..services.llm_service import call_llm_for_chat
 
 router = APIRouter(
-    prefix="/api/games/{game_id}/players",
+    prefix="",
     tags=["chat"],
 )
 
+class PlayerInfo(BaseModel):
+    name: str
+    role: str
+    public_info: str
+    secret: str
+    mission: str
+
+class NpcInfo(BaseModel):
+    name: str
+    description: str
+
 class ChatRequest(BaseModel):
+    game_id: str = Field(..., description="遊戲 ID")
+    player_id: str = Field(..., description="玩家 ID")
+    npc_id: str = Field(..., description="NPC ID")
     text: str = Field(..., description="玩家說的話")
-    model: str = Field("gemini-2.0-flash", description="LLM 模型名稱")
-    temperature: float = Field(0.7, ge=0, le=1, description="隨機性控制 (0~1)")
+    model: str = Field(default="gemini-2.0-flash", description="LLM 模型名稱")
+    temperature: float = Field(default=0.7, ge=0, le=1, description="隨機性控制 (0~1)")
+    background: str = Field(..., description="遊戲故事背景")
+    npc_info: NpcInfo = Field(..., description="NPC 資訊")
+    player_info: PlayerInfo = Field(..., description="玩家角色資訊")  # 新增
+    chat_history: List[Dict[str, str]] = Field(default_factory=list, description="對話歷史")
 
 class ChatResponse(BaseModel):
     dialogue: str = Field(..., description="NPC 的完整對話回應")
-    hint: Optional[str] = Field(None, description="NPC 提供的線索提示")
-    evidence: Optional[dict] = Field(None, description="NPC 提供的新證據 (id, name, description)")
+    hint: Optional[str] = Field(None, description="線索提示")
+    evidence: Optional[str] = Field(None, description="證據")
 
-@router.post("/{player_id}/chat/{npc_id}", response_model=ChatResponse)
-async def chat_with_npc(
-    game_id: int,
-    player_id: str,
-    npc_id: str,
-    req: ChatRequest,
-    session: Session = Depends(get_session),
-):
-    # 1. 檢查遊戲
-    game = session.get(Game, game_id)
-    if not game:
-        raise HTTPException(404, "Game not found")
-    if not game.background:
-        raise HTTPException(400, "請先生成並確認故事背景")
+@router.post("/npc", response_model=ChatResponse)
+async def chat_with_npc(req: ChatRequest):
+    """
+    與 NPC 對話的 API
+    """
+    try:
+        print(f"=== Chat API Called ===")
+        print(f"Received request: {req}")
+        
+        if not req.text or not req.text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="對話內容不能為空"
+            )
 
-    # 2. 取得玩家
-    player = session.get(Player, player_id)
-    if not player or player.game_id != game_id:
-        raise HTTPException(404, "Player not found in this game")
+        # 直接使用前端傳來的玩家角色資訊
+        player_info = {
+            "name": req.player_info.name,
+            "role": req.player_info.role,
+            "public_info": req.player_info.public_info,
+            "secret": req.player_info.secret,
+            "mission": req.player_info.mission
+        }
 
-    # 3. 取得 NPC
-    npc = session.get(Npc, npc_id)
-    if not npc or npc.game_id != game_id:
-        raise HTTPException(404, "NPC not found in this game")
+        # 直接使用前端傳來的 NPC 資訊
+        npc_info = {
+            "name": req.npc_info.name,
+            "description": req.npc_info.description
+        }
 
-    # 4. 撈對話歷史
-    mem = MemoryService(session)
-    history = mem.get_conversation_context(player_id)
+        print(f"玩家角色資訊: {player_info}")
+        print(f"NPC 資訊: {npc_info}")
 
-    # 5. 呼叫 LLM
-    result = await call_llm_for_chat(
-        background  = game.background,
-        character   = {
-            "name":        npc.name,
-            "role":        "NPC",
-            "public_info": npc.description,
-            "secret":      "",
-            "mission":     ""
-        },
-        history      = history,
-        user_text    = req.text,
-        model        = req.model,
-        temperature  = req.temperature
-    )
+        # 呼叫 LLM 服務
+        result = await call_llm_for_chat(
+            background=req.background,
+            player_character=player_info,
+            npc_character=npc_info,
+            history=req.chat_history,
+            user_text=req.text,
+            model=req.model,
+            temperature=req.temperature
+        )
 
-    # 6. 解析結果
-    dialogue = result.get("dialogue", "")
-    hint     = result.get("hint")
-    evidence = result.get("evidence")
+        print(f"LLM result: {result}")
 
-    # 7. 存入對話
-    mem.append_message(player_id, "user",      req.text)
-    mem.append_message(player_id, "assistant", dialogue)
+        response = ChatResponse(
+            dialogue=result.get("dialogue", "抱歉，我現在無法回應。"),
+            hint=result.get("hint"),
+            evidence=result.get("evidence")
+        )
+        
+        print(f"Returning response: {response}")
+        return response
 
-    # 若有新證據，更新玩家紀錄
-    if evidence and isinstance(evidence, dict):
-        player.discovered_evidence = (player.discovered_evidence or []) + [evidence.get("id")]
-        session.add(player)
-        session.commit()
-
-    return ChatResponse(dialogue=dialogue, hint=hint, evidence=evidence)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in chat_with_npc: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"對話處理失敗: {str(e)}"
+        )

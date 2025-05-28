@@ -95,7 +95,8 @@ const DialoguePhase = ({ roomId, playerId, isHost, setCurrentPhase, currentPhase
     <div className="p-6 bg-white rounded-2xl shadow-lg border border-gray-200 space-y-4">
   <div>
     <h2 className="text-2xl font-bold text-indigo-700 mb-2">角色劇本閱讀</h2>
-    <p className="text-gray-700">請先仔細閱讀自己的角色資訊，並在所有人準備好後，輪流進行自我介紹。房主負責點擊「下一步」進入下一階段。</p>
+    {(currentPhase === 'dialogue1') && <p className="text-gray-700">請先仔細閱讀自己的角色資訊，並在所有人準備好後，輪流進行自我介紹。房主負責點擊「下一步」進入下一階段。</p>}
+    {(currentPhase === 'dialogue2') && <p className="text-gray-700">請閱讀自己的第二段角色資訊，在所有人準備好後由房主負責確認進入下一階段。</p>}
   </div>
 
   <hr className="my-4 border-gray-300" />
@@ -103,10 +104,6 @@ const DialoguePhase = ({ roomId, playerId, isHost, setCurrentPhase, currentPhase
   {role ? (
     <div className="space-y-2">
       <p><strong className="text-indigo-600">你的名字：</strong><span className="text-gray-800">{role.name}</span></p>
-      <p><strong className="text-indigo-600">公開資訊：</strong><span className="text-gray-800">{role.public_info}</span></p>
-      <p><strong className="text-indigo-600">秘密：</strong><span className="text-gray-800">{role.secret}</span></p>
-      <p><strong className="text-indigo-600">任務：</strong><span className="text-gray-800">{role.mission}</span></p>
-
       {(currentPhase === 'dialogue1') && (
         <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg mt-4">
           <p><strong className="text-indigo-700">劇本一：</strong>{role.dialogue1}</p>
@@ -118,6 +115,10 @@ const DialoguePhase = ({ roomId, playerId, isHost, setCurrentPhase, currentPhase
           <p><strong className="text-indigo-700">劇本二：</strong>{role.dialogue2}</p>
         </div>
       )}
+      <br></br>
+      <p><strong className="text-indigo-600">公開資訊：</strong><span className="text-gray-800">{role.public_info}</span></p>
+      <p><strong className="text-indigo-600">秘密：</strong><span className="text-gray-800">{role.secret}</span></p>
+      <p><strong className="text-indigo-600">任務：</strong><span className="text-gray-800">{role.mission}</span></p>
 
       {isHost && (currentPhase === 'dialogue1') && (
         <button
@@ -139,13 +140,13 @@ const DialoguePhase = ({ roomId, playerId, isHost, setCurrentPhase, currentPhase
     <p className="text-gray-500">載入角色資料中...</p>
   )}
   {/* debug用 */}
-  {isHost &&(
+  {/* {isHost &&(
         <button
           className="mt-6 w-full bg-indigo-600 text-white font-semibold py-2 rounded-lg hover:bg-indigo-700 transition"
           onClick={setCurrentPhase}>
           跳過
         </button>
-      )}
+      )} */}
 </div>
 
   );

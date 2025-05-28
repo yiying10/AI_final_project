@@ -15,7 +15,6 @@ export default function EndedPhase({ roomId }: EndedPhaseProps) {
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1️⃣ 取得房間解答
       const { data: roomData, error: roomError } = await supabase
         .from('room')
         .select('script_id')
@@ -40,10 +39,9 @@ export default function EndedPhase({ roomId }: EndedPhaseProps) {
 
       setAnswer(scriptData?.answer || '未設定解答');
 
-      // 2️⃣ 取得投票資料
       const { data: votes, error: votesError } = await supabase
         .from('vote')
-        .select('voter_id, voted_id')
+        .select('voter_id, voter_id')
         .eq('room_id', roomId);
 
       if (votesError) {
@@ -51,16 +49,14 @@ export default function EndedPhase({ roomId }: EndedPhaseProps) {
         return;
       }
 
-      // 統計票數
       const countMap: Record<string, number> = {};
       votes.forEach((vote) => {
-        if (vote.voted_id) {
-          countMap[vote.voted_id] = (countMap[vote.voted_id] || 0) + 1;
+        if (vote.voter_id) {
+          countMap[vote.voter_id] = (countMap[vote.voter_id] || 0) + 1;
         }
       });
       setVoteCounts(countMap);
 
-      // 3️⃣ 找出票數最多的玩家
       let maxVotes = 0;
       let topPlayerId = null;
       for (const [playerId, count] of Object.entries(countMap)) {
@@ -93,6 +89,13 @@ export default function EndedPhase({ roomId }: EndedPhaseProps) {
   return (
     <div className="bg-white px-4 py-4 rounded-xl shadow-md border border-gray-200 space-y-4">
       <h2 className="text-xl font-bold text-indigo-700">投票結果</h2>
+      <div className="space-y-1 text-gray-700">
+        {Object.entries(voteCounts).map(([playerId, count]) => (
+          <p key={playerId}>
+            {playerMap[playerId]}：<span className="font-semibold">{count} 票</span>
+          </p>
+        ))}
+      </div>
       {mostVotedPlayer ? (
         <p className="text-gray-800">
           大家認為的兇手是：<span className="font-bold text-red-600">{playerMap[mostVotedPlayer]}</span>！
@@ -103,14 +106,6 @@ export default function EndedPhase({ roomId }: EndedPhaseProps) {
 
       <h2 className="text-xl font-bold text-indigo-700">還原真相</h2>
       <p className="text-gray-800">{answer || '載入中...'}</p>
-
-      <div className="space-y-1 text-gray-700">
-        {Object.entries(voteCounts).map(([playerId, count]) => (
-          <p key={playerId}>
-            {playerMap[playerId]}：<span className="font-semibold">{count} 票</span>
-          </p>
-        ))}
-      </div>
 
       <hr className="border-gray-300" />
 
