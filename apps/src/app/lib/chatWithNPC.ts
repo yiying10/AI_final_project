@@ -5,19 +5,25 @@ export interface ChatRequest {
   text: string;
   model?: string;
   temperature?: number;
-  background: string;  // 改為必填
-  npc_info: Record<string, any>;  // 改為必填
+  background: string;
+  npc_info: {
+    name: string;
+    description: string;
+  };
+  player_info: {  // 新增：玩家角色資訊
+    name: string;
+    role: string;
+    public_info: string;
+    secret: string;
+    mission: string;
+  };
   chat_history?: any[];
 }
 
 export interface ChatResponse {
-  dialogue: string;  // 修正：後端回傳的是 dialogue，不是 reply
+  dialogue: string;
   hint?: string | null;
-  evidence?: {
-    id: string;
-    name: string;
-    description: string;
-  } | null;
+  evidence?: string | null;  // 改為 string 與後端一致
 }
 
 export async function chatWithNPC(
@@ -32,13 +38,16 @@ export async function chatWithNPC(
     throw new Error('對話內容不能為空');
   }
 
-  // 確保 background 和 npc_info 不為空
   if (!body.background) {
     throw new Error('遊戲背景不能為空');
   }
 
   if (!body.npc_info) {
     throw new Error('NPC 資訊不能為空');
+  }
+
+  if (!body.player_info) {
+    throw new Error('玩家角色資訊不能為空');
   }
 
   // 構建完整的請求體
@@ -51,6 +60,7 @@ export async function chatWithNPC(
     temperature: body.temperature ?? 0.7,
     background: body.background,
     npc_info: body.npc_info,
+    player_info: body.player_info,  // 新增：玩家角色資訊
     chat_history: body.chat_history || []
   };
 
@@ -66,9 +76,6 @@ export async function chatWithNPC(
       },
       body: JSON.stringify(requestBody)
     });
-
-    console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
 
     if (!response.ok) {
       const errorText = await response.text();
