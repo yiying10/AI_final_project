@@ -70,7 +70,10 @@ class GameObj(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     location_id: int  = Field(foreign_key="location.id")
     name: str
-    lock: bool = Field(default=True)
+    lock: int = Field(
+        default=None, 
+        description="可解鎖此物件的 NPC ID，若為 None 則表示無需解鎖"
+    )
     clue: Optional[str] = None
     
      # 新增：owner_id 記錄解鎖此物件的 Player

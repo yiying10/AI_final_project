@@ -1,74 +1,48 @@
 'use client';
+
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import { SYSTEM_USER_ID } from '../lib/config';
+import { useSyncedTimer } from '../lib/useSyncedTimer';
 
 interface DiscussionPhaseProps {
   roomId: string;
-  timer: number;
-  setTimer: React.Dispatch<React.SetStateAction<number>>;
-  setCurrentPhase: (phase: string) => void;
+  currentPhase: string;
+  isHost: boolean;
+  setCurrentPhase: () => void;
 }
 
 export default function DiscussionPhase({
   roomId,
-  timer,
-  setTimer,
+  currentPhase,
   setCurrentPhase,
+  isHost
 }: DiscussionPhaseProps) {
-  const [isTimerInitialized, setIsTimerInitialized] = useState(false); // 新增狀態追蹤計時器是否已初始化
   
-  // 初始化計時器，只在組件首次渲染時執行
-  useEffect(() => {
-    if (!isTimerInitialized) {
-      setTimer(30);
-      setIsTimerInitialized(true); // 標記計時器已初始化
-    }
-  }, [isTimerInitialized, setTimer]);
-
-  // 倒計時邏輯
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-
-          // 切換到投票階段
-          (async () => {
-            const { error: messageError } = await supabase
-              .from('messages')
-              .insert([
-                {
-                  room_id: roomId,
-                  sender_id: SYSTEM_USER_ID,
-                  receiver_id: null,
-                  content: '討論階段結束，現在是投票時間',
-                },
-              ]);
-
-            if (messageError) {
-              console.error('發送系統訊息失敗:', messageError);
-            }
-            setCurrentPhase('discussion');
-
-          })();
-
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval); // 清除計時器
-  }, [timer, roomId, setTimer, setCurrentPhase]);
+  const timer = useSyncedTimer({
+    roomId,
+    phase: currentPhase,
+    isHost,
+    duration: 10, //TODO: 300 
+    onTimerEnd: () => setCurrentPhase(), // 房主結束時切換
+  });
 
   return (
-    <div className="bg-gray-50 p-4 rounded-lg border">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-xl font-bold">討論階段</h3>
-        <span className="text-lg font-bold text-red-600">倒計時：{timer} 秒</span>
+    <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 space-y-4">
+      <div className="flex justify-between items-center">
+        <div className="text-indigo-700 font-semibold text-xl">
+          {currentPhase === 'discussion1' && '第一階段討論'}
+          {currentPhase === 'discussion2' && '第二階段討論'}
+        </div>
+        <div className="bg-red-100 text-red-700 font-bold px-4 py-1 rounded-full shadow-sm">
+          倒計時：{timer} 秒
+        </div>
       </div>
-      <p>與其他玩家討論案件，分享線索，找出兇手。</p>
+  
+      <hr className="border-gray-300" />
+  
+      <p className="text-gray-700 leading-relaxed">
+        請與其他玩家討論案件，分享你的角色視角與線索，嘗試推敲出誰是真正的兇手。
+      </p>
     </div>
   );
+  
 }

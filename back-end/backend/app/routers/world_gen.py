@@ -45,7 +45,9 @@ class ActInfo(BaseModel):
 class GameObjectInfo(BaseModel):
     id:       int
     name:     str
-    lock:     bool
+    lock:     int | None = Field(
+       None, description="可解鎖此物件的 NPC ID"
+   )
     clue:     str | None
     owner_id: int | None
 
@@ -79,6 +81,7 @@ async def generate_full_content(req: WorldGenRequest):
     # 生成 NPC
     raw_npcs = await call_llm_for_npcs(
         background=background,
+        characters=[{"name": c["name"]} for c in raw_chars],
         num_npcs=req.num_npcs,
         model=req.model,
         temperature=req.temperature,

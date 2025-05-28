@@ -29,7 +29,9 @@ export interface Act {
 export interface GameObject {
   id: number;
   name: string;
-  lock: boolean;
+  script_id: string;
+  map_id: string;
+  unlock: string | null;//npc_id
   clue: string | null;
   owner_id: number | null;
 }
@@ -126,6 +128,13 @@ export async function generateWorldAndSave(
 
     if (scriptError || !script) throw new Error('儲存 GameScript 失敗: ' + scriptError?.message);
     const scriptId = script.id;
+    
+    const { error: roomError } = await supabase
+      .from('room')
+      .update({ script_id: scriptId })
+      .eq('id', roomId);
+
+    if (roomError) throw new Error('更新 room 的 script_id 失敗: ' + roomError.message);
 
     const roles = worldData.characters.map((char) => {
       const act1 = worldData.acts[0]?.scripts.find((s) => s.character === char.name)?.dialogue || '';
@@ -151,24 +160,51 @@ export async function generateWorldAndSave(
     if (mapError) throw new Error('儲存 GameMap 失敗: ' + mapError.message);
 
     const mapIdLookup = new Map(mapInserts.map((m) => [m.name, m.id]));
-
-    const npcs = worldData.npcs.map((npc) => ({
-      script_id: scriptId,
-      name: npc.name,
-      ref: npc.id,
-    }));
+    
+    const npcs = worldData.locations.flatMap((loc) =>
+      loc.npcs.map((npcId) => ({
+        script_id: scriptId,
+        map_id: mapIdLookup.get(loc.name),
+        name: worldData.npcs.find((n) => n.id === npcId)?.name || '',
+        ref: npcId.toString(), // 或留空 ''
+      }))
+    );
     await supabase.from('gamenpc').insert(npcs);
 
+    // 處理 GameObject
     const objects = worldData.locations.flatMap((loc) =>
       loc.objects.map((obj) => ({
         script_id: scriptId,
         map_id: mapIdLookup.get(loc.name),
         name: obj.name,
         content: obj.clue || '',
-        lock: obj.lock || null,
+        unlock: obj.unlock ?? null,
       }))
     );
-    await supabase.from('gameobject').insert(objects);
+
+    if (objects.length > 0) {
+      const { error: objectError } = await supabase.from('gameobject').insert(objects);
+      if (objectError) throw new Error('儲存 GameObject 失敗: ' + objectError.message);
+    }
+
+    // 處理 UnlockObject（只挑有 owner_id 的）
+    // const unlockObjects = worldData.locations.flatMap((loc) =>
+    //   loc.objects
+    //     .filter((obj) => obj.owner_id !== null)
+    //     .map((obj) => ({
+    //       script_id: scriptId,
+    //       npc_id: null,  // 如果未來有 NPC 解鎖邏輯再補
+    //       name: obj.name + ' 解鎖道具',
+    //       content: obj.clue || '',
+    //       owner_id: obj.owner_id,
+    //     }))
+    // );
+
+    // if (unlockObjects.length > 0) {
+    //   const { error: unlockError } = await supabase.from('unlockobject').insert(unlockObjects);
+    //   if (unlockError) throw new Error('儲存 UnlockObject 失敗: ' + unlockError.message);
+    // }
+
 
     console.log('世界資料寫入成功！');
     return { success: true, scriptId };

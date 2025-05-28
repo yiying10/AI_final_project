@@ -8,7 +8,17 @@ import { toast } from 'react-hot-toast';
 import GameContent from '../../GameContent';
 import { MAX_PLAYER } from '../../lib/config';
 // 遊戲狀態
-type GameStatus = 'waiting' | 'introduction' | 'selecting_roles' | 'investigation1' | 'discussion1' |  'investigation2' | 'discussion2' | 'voting' | 'ended';
+type GameStatus = 'introduction'|
+    'role_selection'|
+    'dialogue1'|
+    'investigation'|
+    'discussion'|
+    'dialogue2'|
+    'investigation'|
+    'discussion'|
+    'voting'|
+    'ended'|
+    'waiting';
 
 interface Player {
   id: string;
@@ -221,11 +231,30 @@ export default function RoomPage() {
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'player', filter: `room_id=eq.${room.id}` },
-      (payload) => {
+      async (payload) => {
         console.log('玩家變更:', payload);
         loadPlayers();
+    
+        if (payload.eventType === 'DELETE') {
+          const deletedPlayer = payload.old as Player;
+          console.log('玩家離開:', deletedPlayer);
+    
+          // 發送系統訊息
+          try {
+            await supabase.from('message').insert([{
+              room_id: room.id,
+              sender_id: null,
+              receiver_id: null,
+              content: `${deletedPlayer.name} 已離開房間`,
+            }]);
+            console.log('已發送玩家離開房間的系統訊息');
+          } catch (err) {
+            console.error('發送系統訊息失敗:', err);
+          }
+        }
       }
     )
+    
     .subscribe();
 
   loadPlayers();
@@ -346,36 +375,35 @@ export default function RoomPage() {
   };
 
   return (
-    <main className="max-w-xl mx-auto p-6">
-      <h2 className="text-2xl font-bold mb-1">房間代碼：{room.room_code}</h2>
-      <p className="text-gray-600 text-sm mb-4">你的名稱：{player.name}</p>
-      {/* <p>狀態：{room.status}</p> */}
-      <div className="bg-gray-100 px-3 py-2 rounded mb-4">
-        <p className="font-medium">
-          人數：{players.length} / {MAX_PLAYER}
-        </p>
+    <main className="max-w-xl mx-auto p-6 space-y-6 bg-white rounded-xl shadow-md border border-gray-200">
+      <div>
+        <h2 className="text-2xl font-bold text-indigo-700 mb-1">房間代碼：{room.room_code}</h2>
+        <p className="text-gray-600 text-sm">你的名稱：<span className="font-medium text-gray-800">{player.name}</span></p>
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+        <p className="font-semibold text-gray-700">人數：{players.length} / {MAX_PLAYER}</p>
       </div>
 
       {/* 房主控制面板 */}
       {player.is_host && room.status === 'waiting' && (
-        <div className="mt-4 p-4 border rounded bg-gray-50">
-          <h3 className="text-lg font-semibold mb-2">房主控制面板</h3>
+        <div className="p-4 border rounded-lg bg-gray-50 shadow-inner space-y-2">
+          <h3 className="text-lg font-semibold text-indigo-700">房主控制面板</h3>
           <button
             onClick={handleStartGame}
-            disabled={players.length < 1}
-            className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            disabled={players.length < 1} //TODO
+            className="w-full py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
           >
             開始遊戲
           </button>
-          {players.length < 1 && (
-            <p className="text-sm text-red-600 mt-2">需要至少1名玩家才能開始遊戲</p>
+          {players.length < 4 && (
+            <p className="text-sm text-red-600">需要至少 4 名玩家才能開始遊戲</p>
           )}
         </div>
       )}
 
-
       {/* 遊戲內容 */}
-      {room.status !== 'waiting'&& (
+      {room.status !== 'waiting' && (
         <GameContent
           roomId={room.id}
           playerId={player.id}
@@ -384,27 +412,28 @@ export default function RoomPage() {
       )}
 
       {/* 聊天室 */}
-      <div className="mt-6 border rounded bg-white shadow">
+      <div className="border rounded-lg bg-white shadow">
         <ChatRoom
-        roomId={room.id}
-        playerId={player?.id ?? ''}
-        players={players}
-        setPlayers={setPlayers}
-      />
+          roomId={room.id}
+          playerId={player?.id ?? ''}
+          players={players}
+          setPlayers={setPlayers}
+        />
       </div>
-       {/* 離開房間按鈕 */}
-       <br></br>
-       <button
+
+      {/* 離開房間按鈕 */}
+      <button
         onClick={() => {
           const confirmLeave = window.confirm("確定要離開嗎？");
           if (confirmLeave) {
             leaveRoom();
           }
         }}
-        className="mb-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        className="w-full py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition"
       >
         離開房間
       </button>
     </main>
+
   );
 }
