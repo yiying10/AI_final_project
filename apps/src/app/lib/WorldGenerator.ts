@@ -71,7 +71,7 @@ export async function generateWorld(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         background: background,
-        num_characters: 4,
+        num_characters: options?.num_characters || 4,
         num_npcs: options?.num_npcs || 3,
         num_acts: options?.num_acts || 2,
         model: options?.model || 'gemini-2.0-flash',
