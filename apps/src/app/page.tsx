@@ -6,6 +6,14 @@ import { supabase } from './lib/supabaseClient';
 import { toast } from 'react-hot-toast';
 import { MAX_PLAYER } from './lib/config';
 
+interface Player {
+  id: string;
+  room_id: string;
+  name: string;
+  is_host: boolean;
+  role_id: string | null;
+}
+
 function generateRoomCode(): string {
   const min = 100000;
   const max = 999999;
@@ -23,6 +31,10 @@ export default function HomePage() {
   const [joinCode, setJoinCode] = useState('');
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [player, setPlayer] = useState<Player | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
 
   useEffect(() => {
     const existingCode = localStorage.getItem('user_code');
@@ -35,7 +47,23 @@ export default function HomePage() {
       setUserCode(newCode);
     }
   }, []);
-
+  useEffect(() => {
+    const subscription = supabase
+      .channel('player-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'player' }, payload => {
+        console.log('玩家更新:', payload);
+        if (payload.eventType === 'INSERT') {
+          setPlayers(prev => [...prev, payload.new as Player]);
+        } else if (payload.eventType === 'DELETE') {
+          setPlayers(prev => prev.filter(p => p.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+  
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, []);
   // 創建房間，並建立房主玩家
   async function createRoom() {
     if (!userCode) {
@@ -52,7 +80,7 @@ export default function HomePage() {
       const { data: room, error: roomErr } = await supabase
         .from("room")
         .insert([{ 
-          room_code: code, 
+          room_code: parseInt(code, 10),
           status: 'waiting',
           script_id: null,
           host_id: null,
@@ -73,100 +101,79 @@ export default function HomePage() {
       }
 
       console.log('房間創建成功：', room);
-
-      // 查看 Player 表结构，仅使用必要字段
-      console.log('準備創建玩家，房間ID:', room.id, '暱稱:', name || userCode);
       
-      let createdPlayer;
+      // 創建新玩家（不需要提供id，数据库会自动生成）
+      const isHost = !players || players.length === 0;
+      console.log('準備創建新玩家，房間ID:', room.id, '暱稱:', name || userCode, '是否為房主:', isHost);
+
       try {
-        const { data: player, error: playerErr } = await supabase
+        const { data: newPlayer, error: createErr } = await supabase
           .from('player')
           .insert([{
             room_id: room.id,
             name: name || userCode,
-            is_host: true,
-            role_id: null,
+            is_host: isHost,
+            role_id: null
           }])
-          .select()
+          .select('id, room_id, name, is_host, role_id')
           .single();
 
-        if (playerErr) {
-          console.error('創建玩家失敗，錯誤詳情:', playerErr);
-          toast.error('建立玩家失敗：' + playerErr.message);
-          
-          // 清理：如果創建玩家失敗，刪除已創建的房間
-          await supabase
-            .from('room')
-            .delete()
-            .eq('id', room.id);
-            
+        if (createErr) {
+          console.error('创建玩家失败，錯誤詳情:', createErr);
+          setError('創建玩家失敗: ' + createErr.message);
+          setLoading(false);
           return;
         }
 
-        if (!player) {
-          console.error('創建玩家失敗：未返回玩家數據');
-          toast.error('建立玩家失敗：未返回玩家數據');
-          
-          // 清理：如果創建玩家失敗，刪除已創建的房間
-          await supabase
-            .from('room')
-            .delete()
-            .eq('id', room.id);
-            
+        if (!newPlayer) {
+          console.error('创建玩家失败: 未返回玩家數據');
+          setError('創建玩家失敗: 未返回玩家數據');
+          setLoading(false);
           return;
         }
+
+        console.log('成功创建新玩家:', newPlayer);
         
-        createdPlayer = player;
+        // 保存玩家ID到localStorage
+        localStorage.setItem(`player_id_${code}`, newPlayer.id);
+        localStorage.setItem(`player_created_${code}`, 'true');
 
-        // 檢查玩家是否真的被創建
-        const { data: checkPlayer } = await supabase
-          .from('player')
-          .select('*')
-          .eq('id', player.id)
-          .single();
-          
-        if (checkPlayer) {
-          console.log('確認玩家已成功創建:', checkPlayer);
-        } else {
-          console.warn('警告：無法確認玩家是否成功創建');
+        // 如果是房主，更新房间的创建者ID
+        if (isHost) {
+          const { error: updateRoomErr } = await supabase
+            .from('room')
+            .update({ host_id: newPlayer.id })
+            .eq('id', room.id);
+
+          if (updateRoomErr) {
+            console.error('更新房间创建者失败:', updateRoomErr);
+          }
         }
+
+        setPlayer(newPlayer);
+        setPlayers(players ? [...players, newPlayer] : [newPlayer]);
 
         // 發送系統消息：玩家創建了房間
         try {
-          await supabase.from('messages').insert([{
+          await supabase.from('message').insert([{
             room_id: room.id,
-            sender_id: player.id,
+            sender_id: null, // 改為 null 代表系統
             receiver_id: null,
-            content: `${player.name} 創建了房間`,
+            content: `${newPlayer.name} 創建了房間`,
           }]);
         } catch (messageError) {
           console.error('發送系統消息失敗:', messageError);
           // 不中斷流程，繼續執行
         }
 
-        console.log('玩家創建成功：', player);
-        
-        // 保存玩家ID和暱稱到localStorage
-        localStorage.setItem(`player_id_${code}`, player.id);
-        localStorage.setItem(`player_created_${code}`, 'true');
-        if (name) {
-          localStorage.setItem('user_name', name);
-        }
-      } catch (createPlayerError) {
-        console.error('創建玩家時發生異常:', createPlayerError);
-        toast.error('創建玩家時發生異常: ' + (createPlayerError instanceof Error ? createPlayerError.message : '未知錯誤'));
-        
-        // 清理：如果創建玩家失敗，刪除已創建的房間
-        await supabase
-          .from('room')
-          .delete()
-          .eq('id', room.id);
-          
+        toast.success('房間創建成功！');
+        router.push(`/room/${code}`);
+      } catch (insertError) {
+        console.error('創建玩家時發生異常:', insertError);
+        setError('創建玩家時發生異常: ' + (insertError instanceof Error ? insertError.message : '未知錯誤'));
+        setLoading(false);
         return;
       }
-      
-      toast.success('房間創建成功！');
-      router.push(`/room/${code}`);
     } catch (error) {
       console.error('創建房間時發生錯誤：', error);
       toast.error('創建房間時發生錯誤：' + (error instanceof Error ? error.message : '未知錯誤'));
@@ -194,12 +201,19 @@ export default function HomePage() {
       const { data: room, error: roomErr } = await supabase
         .from('room')
         .select('*')
-        .eq('room_code', code)
+        .eq('room_code', parseInt(code, 10))
         .single();
 
       if (roomErr || !room) {
         toast.error('房間不存在，請重新輸入');
         alert('查無此房間代碼，請確認後重新輸入');
+        setJoinCode('');
+        return;
+      }
+
+      if (roomErr || room.status != 'waiting' && room.status != 'introduction') {
+        toast.error('此房間已開始遊戲，請尋找其他房間');
+        alert('此房間已開始遊戲，請尋找其他房間');
         setJoinCode('');
         return;
       }
@@ -212,6 +226,7 @@ export default function HomePage() {
 
       if (playerCount && playerCount >= MAX_PLAYER) {
         toast.error('房間已滿');
+        alert("此房間已滿，請選擇其他房間");
         return;
       }
 
@@ -222,9 +237,9 @@ export default function HomePage() {
           room_id: room.id,
           name: name || userCode,
           is_host: false,
-          role: null,
+          role_id: null
         }])
-        .select()
+        .select('id, room_id, name, is_host, role_id')
         .single();
 
       if (playerErr || !player) {
@@ -234,9 +249,9 @@ export default function HomePage() {
 
       // 發送系統消息：玩家加入了房間
       try {
-        await supabase.from('messages').insert([{
+        await supabase.from('message').insert([{
           room_id: room.id,
-          sender_id: player.id,
+          sender_id: null, // 改為 null 代表系統
           receiver_id: null,
           content: `${player.name} 加入了房間`,
         }]);
@@ -263,44 +278,63 @@ export default function HomePage() {
   }
 
   return (
-    <main className="max-w-md mx-auto p-6 space-y-8">
-      <h1 className="text-3xl font-bold text-center">劇本殺遊戲</h1>
-      <p className="text-center text-gray-500">預設暱稱：{userCode}</p>
+    <main className="max-w-md mx-auto p-6 space-y-6 bg-white rounded-xl shadow-md border border-gray-200">
+      <div className="space-y-2 text-center">
+        <h1 className="text-3xl font-bold text-indigo-700">AI劇本殺遊戲</h1>
+        <p className="text-gray-500">預設暱稱：<span className="font-medium text-gray-700">{userCode}</span></p>
+      </div>
 
-      <input
-        type="text"
-        placeholder="輸入暱稱（可選）"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-full border border-gray-300 rounded px-3 py-2"
-      />
+      <div className="space-y-2">
+        <label className="text-sm font-semibold text-gray-700">自訂暱稱（可選）</label>
+        <input
+          type="text"
+          placeholder="輸入暱稱"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-300"
+        />
+      </div>
 
-      {/* 創房按鈕 */}
       <button
         disabled={creating}
         onClick={createRoom}
-        className="w-full py-3 bg-blue-600 text-white rounded disabled:opacity-50"
+        className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
       >
         {creating ? '創建中...' : '創立新房間'}
       </button>
 
-      {/* 加入房間輸入 */}
-      <div className="flex space-x-2">
-        <input
-          type="text"
-          placeholder="輸入房間代碼"
-          value={joinCode}
-          onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-          className="flex-grow border border-gray-300 rounded px-3 py-2 uppercase tracking-widest"
-          maxLength={6}
-        />
-        <button
-          disabled={joining}
-          onClick={joinRoom}
-          className="px-4 bg-green-600 text-white rounded disabled:opacity-50"
-        >
-          {joining ? '加入中...' : '加入房間'}
-        </button>
+      <div className="space-y-2">
+        <label className="text-sm font-semibold text-gray-700">加入房間</label>
+        <div className="flex space-x-2">
+          <input
+            type="text"
+            placeholder="輸入房間代碼"
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+            className="flex-grow border border-gray-300 rounded-lg px-3 py-2 uppercase tracking-widest focus:ring-2 focus:ring-green-300"
+            maxLength={6}
+          />
+          <button
+            disabled={joining}
+            onClick={joinRoom}
+            className="px-4 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+          >
+            {joining ? '加入中...' : '加入房間'}
+          </button>
+        </div>
+        <div className="space-y-4 text-gray-700 text-sm mt-6 border-t pt-4 border-gray-300">
+        <h2 className="text-lg font-semibold text-indigo-700">劇本殺介紹</h2>
+        <p>劇本殺是一種多人角色扮演推理遊戲，玩家各自扮演劇本中的角色，根據劇情線索進行推理、互動，最終找出真相或完成各自的目標任務。</p>
+        <p>遊戲流程包含以下階段：</p>
+        <ul className="list-disc list-inside pl-4 space-y-1">
+          <li><strong>角色分配：</strong>每位玩家獲得角色身份與背景故事。</li>
+          <li><strong>劇情閱讀：</strong>了解故事背景、任務目標、人物關係。</li>
+          <li><strong>互動環節：</strong>進行角色扮演、提出問題、尋找線索。</li>
+          <li><strong>推理階段：</strong>根據所有線索推理案件真相。</li>
+          <li><strong>結局揭曉：</strong>公開真相，結束遊戲，根據表現評分。</li>
+        </ul>
+        <p className="mt-2">現在就來體驗 AI 劇本殺吧！創建房間或加入房間，開始你的冒險之旅！</p>
+      </div>
       </div>
     </main>
   );

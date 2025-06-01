@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
-import { SYSTEM_USER_ID } from './lib/config';
 import { RealtimePostgresInsertPayload } from '@supabase/supabase-js'; // 可選加型別
 
 interface Message {
@@ -40,7 +39,6 @@ export default function ChatRoom({ roomId, playerId, players, setPlayers }: Chat
         .from('message')
         .select('*')
         .eq('room_id', roomId)
-        .order('created_at', { ascending: true });
 
       if (error) {
         console.error('讀取訊息失敗:', error);
@@ -55,15 +53,25 @@ export default function ChatRoom({ roomId, playerId, players, setPlayers }: Chat
     fetchMessages();
 
     const messageChannel = supabase
-      .channel(`message:room_id=eq.${roomId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message', filter: `room_id=eq.${roomId}` }, (payload) => {
-        const msg = payload.new as Message;
-        setAllMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-      })
-      .subscribe();
+  .channel(`message-room-${roomId}`)
+  .on(
+    'postgres_changes',
+    {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'message',
+      filter: `room_id=eq.${roomId}`,  // ✅ 這行雖然寫著，但實際 filter 不生效
+    },
+    (payload) => {
+      const msg = payload.new as Message;
+      setAllMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    }
+  )
+  .subscribe();
+
 
     return () => {
       isMounted = false;
@@ -94,16 +102,16 @@ export default function ChatRoom({ roomId, playerId, players, setPlayers }: Chat
     fetchPlayers();
 
     const playerChannel = supabase
-    .channel('my-channel')
-    .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'player', filter: `room_id=eq.${roomId}` },
-        (payload) => { console.log(payload) }
-    )
-    .subscribe();
+  .channel('my-channel')
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'player', filter: `room_id=eq.${roomId}` },
+    (payload) => { console.log(payload) }
+  )
+  .subscribe();
 
-    return () => {
-        isMounted = false;
+  return () => {
+    isMounted = false;
     supabase.removeChannel(playerChannel);
   };
 }, [roomId, setPlayers]);
@@ -180,30 +188,50 @@ export default function ChatRoom({ roomId, playerId, players, setPlayers }: Chat
       <div className="flex flex-col flex-1">
         <div className="bg-white p-3 border-b">{receiverName}</div>
         <div className="flex-1 p-3 overflow-y-auto space-y-2" id="chat-messages">
-          {filteredMessages.map((m) => {
-            const sender = players.find((p) => p.id === m.sender_id);
-            const isSystemMessage = m.receiver_id === null;
+        {filteredMessages.map((m) => {
+          const sender = players.find((p) => p.id === m.sender_id);
+          const isSystemMessage = m.sender_id === null;
+          const isOwnMessage = m.sender_id === playerId;
 
-            return (
-              <div
-                key={m.id}
-                className={`p-2 rounded max-w-[90%] ${
-                  isSystemMessage
-                    ? 'bg-gray-100 text-center mx-auto text-gray-500 text-sm border border-gray-200'
-                    : m.sender_id === playerId
-                    ? 'bg-blue-200 self-end ml-auto'
-                    : 'bg-gray-200'
-                }`}
-              >
-                {!isSystemMessage && (
-                  <div className="text-xs text-gray-500 mb-1">
-                    {sender ? sender.name : m.sender_id === playerId ? '你' : '未知'}
-                  </div>
-                )}
-                {m.content}
-              </div>
-            );
-          })}
+          let messageClass = '';
+          let textClass = '';
+          let alignClass = '';
+          let widthClass = '';
+
+          if (selectedReceiverId === null) {
+            // 大廳邏輯
+            if (isSystemMessage) {
+              messageClass = 'bg-gray-100 text-center mx-auto text-gray-500 text-sm border border-gray-200';
+              widthClass = 'w-full max-w-lg';
+              alignClass = 'text-center';
+            } else if (isOwnMessage) {
+              messageClass = 'bg-blue-200 border border-blue-400';
+              widthClass = 'max-w-xs';
+              alignClass = 'self-end ml-auto';
+            } else {
+              messageClass = 'bg-gray-200';
+              widthClass = 'max-w-xs';
+              alignClass = '';
+            }
+          } else {
+            // 私聊邏輯
+            messageClass = isOwnMessage ? 'bg-blue-200 self-end ml-auto' : 'bg-gray-200';
+            widthClass = 'max-w-xs';
+            alignClass = '';
+          }
+
+          return (
+            <div key={m.id} className={`p-2 rounded ${widthClass} ${alignClass} ${messageClass}`}>
+              {!isSystemMessage && (
+                <div className="text-xs text-gray-500 mb-1">
+                  {sender ? sender.name : isOwnMessage ? '你' : '未知'}
+                </div>
+              )}
+              <div>{m.content}</div>
+            </div>
+          );
+        })}
+
         </div>
         <div className="p-3 border-t flex gap-2">
           <input

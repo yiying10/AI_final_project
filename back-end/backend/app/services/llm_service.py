@@ -34,6 +34,8 @@ def call_llm_for_background(
         "當我給你一個「場景」或「主題」，請不要再問任何澄清問題，"
         "直接生成一段生動、引人入勝的故事背景，"
         "設定場景、埋伏筆、留下玩家探索的空間。"
+        "禁止出現「故事背景:」之類的標題，直接輸出內容"
+        "只能用繁體中文"
     )
 
     # 把使用者傳進來的關鍵字包成「場景：…」的格式，並指示「只回傳文字，不要格式」
@@ -68,6 +70,11 @@ async def call_llm_for_characters(
         "請根據以下故事背景，生成指定數量的角色。"
         "每個角色請以 JSON 物件回傳，包含欄位："
         "name, role, public_info, secret, mission。"
+        "所有輸出只能用繁體中文"
+        """每一位角色產生一段 `public_info`，並且：
+        1. **語氣**：全部使用第二人稱「你是…」開頭，例如「你是一位…」，帶入角色身份。  
+        2. **內容**：包含角色的背景（身份或出身）、主要性格特質、當前動機，約 1–2 句話。 """
+        "name：請**只能**填寫人物的「個人姓名」，**不要**加上任何職位、頭銜或敬稱（例如「陳院長」、「王護士長」都不行），要是一個完整姓名。"
     )
     user = f"故事背景：{background}\n請生成 {num_characters} 位角色。"
 
@@ -107,85 +114,140 @@ async def call_llm_for_characters(
     
 async def call_llm_for_chat(
     background: str,
-    character: Dict[str, Any],
-    history: List[Any],  # Message ORM 或 dict
+    player_character: Dict[str, Any],  # 新增：玩家角色資訊
+    npc_character: Dict[str, Any],     # 修正：NPC 角色資訊
+    history: List[Any],
     user_text: str,
     model: str = "gemini-2.0-flash",
     temperature: float = 0.7,
     max_tokens: int = 500,
 ) -> Dict[str, Any]:
     """
-    根據遊戲背景、角色設定及對話歷史，呼叫 Gemini 生成 NPC 回應。
+    根據遊戲背景、玩家角色、NPC 角色設定、對話歷史，呼叫 Gemini 生成 NPC 回應。
     回傳包含 dialogue, hint, evidence 三個欄位。
     """
-    # 1. 系統指令
-    system_instruction_text = (
-        f"你現在扮演劇本殺遊戲中的角色。你的角色是：{character['name']} ({character['role']})。\n"
-        f"遊戲背景如下：\n{background}\n\n"
-        f"角色的公開資訊：{character['public_info']}。\n"
-        f"角色的秘密任務是：{character['mission']}。\n\n"
-        "請完全以此角色的身份和口吻回應玩家，並嚴格以 JSON 物件格式回傳，"
-        "只包含欄位 dialogue, hint, evidence。"
-    )
-
-    # 2. 構建對話內容（只放 user 和 assistant）
-    gemini_contents: List[types.Content] = []
-    for msg in history:
-        role = getattr(msg, 'role', None) or msg.get('role')
-        text = getattr(msg, 'content', None) or msg.get('content', '')
-        gemini_role = 'user' if role == 'user' else 'assistant'
-        gemini_contents.append(
-            types.Content(parts=[types.Part(text=text)], role=gemini_role)
-        )
-    gemini_contents.append(
-        types.Content(parts=[types.Part(text=user_text)], role='user')
-    )
-
-    # 3. 定義回傳的 JSON schema
-    response_schema = types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            'dialogue': types.Schema(type=types.Type.STRING, description="角色對話"),
-            'hint':     types.Schema(type=types.Type.STRING, nullable=True, description="提示，可為 null"),
-            'evidence': types.Schema(type=types.Type.STRING, nullable=True, description="證據，可為 null"),
-        },
-        required=['dialogue']
-    )
-
-    # 4. 配置生成參數，並將系統指令放到 system_instruction
-    gen_config = types.GenerateContentConfig(
-        temperature=temperature,
-        max_output_tokens=max_tokens,
-        response_mime_type="application/json",
-        response_schema=response_schema,
-        candidate_count=1,
-        system_instruction=system_instruction_text
-    )
-
-    # 5. 同步呼叫 Gemini
-    def _sync_call():
-        return client.models.generate_content(
-            model=model,
-            contents=gemini_contents,
-            config=gen_config
-        )
-
-    resp = await asyncio.to_thread(_sync_call)
-
-    # 6. 解析回傳
-    text = resp.text.strip()
+    
     try:
-        data = json.loads(text)
-        return {
-            "dialogue": data.get("dialogue", ""),
-            "hint":     data.get("hint"),
-            "evidence": data.get("evidence"),
-        }
-    except json.JSONDecodeError:
-        return {"dialogue": text, "hint": None, "evidence": None}
+        # 獲取玩家角色資訊
+        player_name = player_character.get("name", "玩家")
+        player_role = player_character.get("role", "調查者")
+        player_public_info = player_character.get("public_info", "一個調查者")
+        player_secret = player_character.get("secret", "想要找出真相")
+        player_mission = player_character.get("mission", "解開謎團")
 
+        # 獲取 NPC 角色資訊
+        npc_name = npc_character.get("name", "未知角色")
+        npc_description = npc_character.get("description", "一個神秘的角色")  # 修正：使用 description
+
+        print(f"處理角色資訊:")
+        print(f"玩家角色:")
+        print(f"  名稱: {player_name}")
+        print(f"  角色: {player_role}")
+        print(f"  公開資訊: {player_public_info}")
+        print(f"  秘密: {player_secret}")
+        print(f"  任務: {player_mission}")
+        print(f"NPC 角色:")
+        print(f"  名稱: {npc_name}")
+        print(f"  描述: {npc_description}")  # 修正：顯示 description
+
+        # 自動為 NPC 生成背景設定
+        # npc_secret = f"{npc_name}知道一些關於這個案件的重要線索"
+        # npc_mission = f"作為{npc_name}，要在保護自己的同時適當地協助或誤導調查"
+
+        # 系統指令
+        system_instruction_text = (
+            f"你現在扮演劇本殺遊戲中的 NPC 角色：{npc_name}。\n"
+            f"遊戲背景如下：\n{background}\n\n"
+            f"你的角色描述：{npc_description}。\n\n"           
+            f"正在與你對話的玩家是：{player_name} ({player_role})。\n"
+            f"玩家的背景：{player_public_info}。\n"
+            f"玩家的目標：{player_mission}。\n"
+            f"玩家的秘密：{player_secret}。\n"
+            f"玩家的任務：{player_mission}。\n\n"
+            "所有輸出只能用繁體中文\n"
+            "請完全以 NPC 的身份和口吻回應玩家。\n"
+            "請嚴格以 JSON 物件格式回傳，只包含欄位 dialogue, hint, evidence。\n"
+            "dialogue 是你作為 NPC 的對話回應\n"
+            "hint 是給玩家的線索提示（可為 null）\n"
+            "evidence 是新發現的證據描述（可為 null）"
+        )
+
+        # 構建對話內容
+        gemini_contents: List[types.Content] = []
+        for msg in history:
+            if hasattr(msg, 'role') and hasattr(msg, 'content'):
+                role = 'user' if msg.role == 'user' else 'model'
+                gemini_contents.append(
+                    types.Content(parts=[types.Part(text=msg.content)], role=role)
+                )
+            elif isinstance(msg, dict):
+                role = 'user' if msg.get('role') == 'user' else 'model'
+                content = msg.get('content', '')
+                gemini_contents.append(
+                    types.Content(parts=[types.Part(text=content)], role=role)
+                )
+        
+        gemini_contents.append(
+            types.Content(parts=[types.Part(text=user_text)], role='user')
+        )
+
+        # 定義回傳的 JSON schema
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                'dialogue': types.Schema(type=types.Type.STRING, description="NPC 對話"),
+                'hint': types.Schema(type=types.Type.STRING, nullable=True, description="提示，可為 null"),
+                'evidence': types.Schema(type=types.Type.STRING, nullable=True, description="證據，可為 null"),
+            },
+            required=['dialogue']
+        )
+
+        # 配置生成參數
+        gen_config = types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            response_mime_type="application/json",
+            response_schema=response_schema,
+            candidate_count=1,
+            system_instruction=system_instruction_text
+        )
+
+        # 同步呼叫 Gemini
+        def _sync_call():
+            return client.models.generate_content(
+                model=model,
+                contents=gemini_contents,
+                config=gen_config
+            )
+
+        resp = await asyncio.to_thread(_sync_call)
+
+        # 解析回傳
+        try:
+            result = json.loads(resp.text)
+            print(f"LLM 原始回應: {result}")
+            return result
+        except json.JSONDecodeError as e:
+            print(f"JSON 解析失敗: {e}, 原始回傳: {resp.text}")
+            return {
+                "dialogue": f"{npc_name}說：抱歉，我現在無法正常回應。",
+                "hint": None,
+                "evidence": None
+            }
+            
+    except Exception as e:
+        print(f"LLM 呼叫失敗: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "dialogue": f"抱歉，{npc_character.get('name', '我')}暫時無法回應。",
+            "hint": None,
+            "evidence": None
+        }
+               
 async def call_llm_for_npcs(
     background: str,
+    characters: Dict[str, Any],
     num_npcs: int,
     model: str = "gemini-2.0-flash",
     temperature: float = 0.7
@@ -193,6 +255,9 @@ async def call_llm_for_npcs(
     system = (
         "你是一名劇本殺編劇，根據以下故事背景生成指定數量的 NPC 角色。"
         "請以純 JSON 陣列回傳，每個元素包含 name, description 兩個欄位。"
+        "所有輸出只能用繁體中文"
+        "name：請**只能**填寫人物的「個人姓名」，**不要**加上任何職位、頭銜或敬稱（例如「陳院長」、「王護士長」都不行），要是一個完整的姓名。"
+        f"NPC角色不可以和已生成的{characters}有重複"
     )
     user = f"故事背景：{background}\\n請生成 {num_npcs} 位 NPC。"
     schema = {
@@ -230,13 +295,15 @@ async def call_llm_for_scenes_and_ending(
     temperature: float = 0.7,
     max_tokens: int = 3000,
 ) -> Tuple[List[Dict[str, Any]], str]:
-    # 1️⃣ 强调纯 JSON 输出的 system prompt
+    # 强调纯 JSON 输出的 system prompt
     names = [ch["name"] for ch in characters]
     names_str = "、".join(names)
     system = (
        f"只能用{names_str}當作角色編寫劇本"
        f"故事地點只能用：{locations}\n"
         f"故事內容融入 NPC ：{npcs}\n"
+        f"兇手不能是{characters}裡的角色也不能是{npcs}"
+        "只能用繁體中文"
        " 你是一個專業的劇本殺編劇："
         """
         1. 劇本結構：輸出一個 JSON 物件 {"acts":[...],"ending":string}，嚴格遵守格式，不要多餘文字或標記。
@@ -244,20 +311,21 @@ async def call_llm_for_scenes_and_ending(
             -**請確保所有字串內容中的特殊字元（例如雙引號本身、換行符等）都進行** **JSON 逸出 (escaped)**。例如：`"This is a \"quote\"."` 或 `"Line1\nLine2"`。
             -**所有逗號 `,` 和括號 `[]` `{}` 都必須正確配對。**
         
-        2. 解謎氛圍：
+        3. 解謎氛圍：
         - 每幕至少隱藏 1–2 個「關鍵線索」，以及 1 個「迷惑線索」（red herring），不要用括號或標籤標示，只要以銜接語直接寫進敘事中。
         - 線索形式可以是：書信暗號、拼圖碎片、對話暗示等，並在文本中給出簡要解謎提示。
-        3. 角色動機：
+        4. 角色動機：
         - 每個角色腳本中要包含一句「隱藏動機」，增加討論衝突，一樣不要用括號或標籤標示，只要以銜接語直接寫進敘事中。。
-        4. 漸進揭露：
+        5. 漸進揭露：
         - 幕與幕之間要有連貫性：第一幕揭開事件冰山一角，第二幕拼湊部分真相，第三幕提供最後兇手線索。
-        5. 每幕腳本長度：
+        6. 每幕腳本長度：
+        -“dialogue” 中 **禁止** 出現“我是李明”之類的自我介紹句子；請直接以角色的語氣進入對話。
         - 每個角色在每幕的專屬劇本 100–200 字，保證足夠細節。
-        6. 嵌入謎題：
+        7. 嵌入謎題：
         - 部分線索請以「謎題」形式出現（例如：『密碼是屋頂牌匾上的三個字母』），讓玩家必須解題才能進入下一步。
         """
     )
-    # 2️⃣ user prompt 描述任务
+    #  user prompt 描述任务
     user = (
         f"故事背景：{background}\n"
         f"角色清單（必須依此順序輸出）：{json.dumps([c['name'] for c in characters], ensure_ascii=False)}\n"
@@ -266,7 +334,7 @@ async def call_llm_for_scenes_and_ending(
         "最後再給一個 ending (字串)。"
     )
 
-    # 3️⃣ 定义 JSON schema
+    #  定義 JSON schema
     schema = {
         "type": "object",
         "properties": {
@@ -305,7 +373,7 @@ async def call_llm_for_scenes_and_ending(
         max_output_tokens=max_tokens
     )
 
-    # 4️⃣ 同步调用 Gemini
+    #  同步调用 Gemini
     def _sync_call():
         return client.models.generate_content(
             model=model,
@@ -349,12 +417,14 @@ async def call_llm_for_locations(
     system = (
         "你是一個專業的劇本殺編劇，"
         "請根據故事背景、角色列表和 NPC 列表，生成遊戲中所有的「地點」。"
+        "至少3個地點"
         "每個地點要包含四個欄位："
         " 1) id (整數，地點識別，從 1 開始)、"
         " 2) name (地點名稱)、"
         " 3) npcs (整數陣列，對應 NPC 的 id)、"
-        " 4) objects (物件陣列，每個物件要有 id, name, lock(boolean), clue(string或null), owner_id(integer, 預設為null))。"
+        " 4) objects (物件陣列，每個物件要有 id, name, lock(int), clue(string，一定要有), owner_id(integer, 預設為null))。"
         "務必只回傳純 JSON 陣列，不要多任何說明文字。"
+        "只能用繁體中文"
     )
     user = (
         f"故事背景：{background}\n"
@@ -377,7 +447,7 @@ async def call_llm_for_locations(
                         "properties": {
                             "id":   {"type": "integer"},
                             "name": {"type": "string"},
-                            "lock": {"type": "boolean"},
+                            "lock": {"type": "integer", "nullable": True, "description": "可解鎖此物件的 NPC ID"},
                             "clue": {"type": "string", "nullable": True},
                             "owner_id": {"type": "integer", "nullable": True, "description": "已解鎖此物件的玩家 ID"}
                         },

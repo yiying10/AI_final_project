@@ -3,8 +3,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 import { useRouter } from 'next/navigation';
-import { getGameContent } from './lib/Map';
-import {SYSTEM_USER_ID} from './lib/config';
 import ChatRoom from "./ChatRoom";
 
 import IntroductionPhase from './phases/IntroductionPhase';
@@ -14,6 +12,7 @@ import DiscussionPhase from './phases/DiscussionPhase';
 import VotingPhase from './phases/VotingPhase';
 import EndedPhase from './phases/EndedPhase';
 import DefaultPhase from './phases/DefaultPhase';
+import DialoguePhase from './phases/DialoguePhase';
 
 interface GameContentProps {
   roomId: string;
@@ -36,43 +35,67 @@ export default function GameContent({
   const [timer, setTimer] = useState<number>(300);
   const [playerInfo, setPlayerInfo] = useState<any>(null);
   const [discoveredClues, setDiscoveredClues] = useState<string[]>([]);
-  const gameContent = getGameContent();
   const [isHost, setIsHost] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'map' | 'chat'>('map');
+  const [roomCode, setRoomCode] = useState<number>(0);
 
   const phaseList = [
     'introduction',
     'role_selection',
-    'investigation',
-    'discussion',
+    'dialogue1',
+    'investigation1',
+    'discussion1',
+    'dialogue2',
+    'investigation2',
+    'discussion2',
     'voting',
     'ended',
   ];
+  useEffect(() => {
+    const fetchRoomCode = async () => {
+      const { data, error } = await supabase
+        .from('room')
+        .select('room_code')
+        .eq('id', roomId)
+        .single();
+  
+      if (!error && data) {
+        setRoomCode(data.room_code);
+      } else {
+        console.error('獲取 room_code 失敗:', error);
+      }
+    };
+  
+    fetchRoomCode();
+  }, [roomId]);
 
   const goToNextPhase = async () => {
-    setCurrentPhase((prevPhase) => {
-      const currentIndex = phaseList.indexOf(prevPhase);
-      if (currentIndex !== -1 && currentIndex < phaseList.length - 1) {
-        const nextPhase = phaseList[currentIndex + 1];
-        
-        // 更新房間的 status
-        supabase
-          .from('room')
-          .update({ status: nextPhase })
-          .eq('id', roomId)
-          .then(({ error }) => {
-            if (error) {
-              console.error('更新房間狀態失敗:', error);
-            }
-          });
-        console.log(`切換到下一階段: ${nextPhase}`);
-        return nextPhase;
-      }
-      return prevPhase; // 如果已經是最後一階段，保持不變
-    });
-  };
+    if (!isHost) return;
+    const currentIndex = phaseList.indexOf(currentPhase);
+    if (currentIndex === -1 || currentIndex >= phaseList.length - 1) {
+      console.log('已經是最後一階段或找不到目前階段');
+      return;
+    }
 
-  //角色初始化與訂閱房間狀態
+    const nextPhase = phaseList[currentIndex + 1];
+
+    // 更新 Supabase 房間狀態
+    const { error } = await supabase
+      .from('room')
+      .update({ status: nextPhase })
+      .eq('id', roomId);  
+    
+    if (error) {
+      console.error('更新房間狀態失敗:', error);
+      return;
+    }
+  
+    // 更新本地狀態
+    if(isHost) setCurrentPhase(nextPhase);
+    console.log(`切換到下一階段: ${nextPhase}`);
+  };
+  
+
   useEffect(() => {
     const roomChannel = supabase
       .channel(`room:id=eq.${roomId}`)
@@ -82,28 +105,9 @@ export default function GameContent({
         }
       })
       .subscribe();
-
-    if (playerInfo) {
-      setCurrentPhase('role_selection');
-    }
-
+  
     return () => {
       supabase.removeChannel(roomChannel);
-    };
-  }, [roomId, playerRole, playerInfo]);
-
-  //訂閱訊息
-  useEffect(() => {
-    const messageChannel = supabase
-      .channel(`message:room_id=eq.${roomId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message', filter: `room_id=eq.${roomId}` }, (payload) => {
-        console.log('新訊息:', payload.new);
-        // 你可以在這裡更新訊息列表或顯示通知
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(messageChannel);
     };
   }, [roomId]);
   
@@ -153,6 +157,7 @@ export default function GameContent({
           <IntroductionPhase
             isHost={isHost}
             roomId={roomId}
+            roomCode={roomCode}
             playerId={playerId}
             setCurrentPhase={goToNextPhase} // 使用通用函式
           />
@@ -168,28 +173,62 @@ export default function GameContent({
             setCurrentPhase={goToNextPhase} 
           />
         );
+      case 'dialogue1':
+        return (
+          <DialoguePhase
+            playerId={playerId}
+            roomId={roomId}
+            isHost={isHost}
+            currentPhase={currentPhase}
+            setCurrentPhase={goToNextPhase} // 使用通用函式
+          />
+        );
 
-      case 'investigation':
+      case 'investigation1':
         return <InvestigationPhase
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          timer={timer}
-          setTimer={setTimer}
-          discoveredClues={discoveredClues}
-          setDiscoveredClues={setDiscoveredClues}
-          gameContent={gameContent}
           roomId={roomId}
+          isHost={isHost}
+          roomCode={roomCode}
           playerId={playerId}
+          currentPhase={currentPhase}
           setCurrentPhase={goToNextPhase} // 使用通用函式
          />;
 
-      case 'discussion':
+      case 'discussion1':
         return <DiscussionPhase 
+        isHost={isHost}
         roomId={roomId}
-        setTimer={setTimer}
-        timer={timer}
+        currentPhase={currentPhase}
         setCurrentPhase={goToNextPhase} // 使用通用函式
         />;
+        case 'dialogue2':
+          return (
+            <DialoguePhase
+              playerId={playerId}
+              roomId={roomId}
+              isHost={isHost}
+              currentPhase={currentPhase}
+              setCurrentPhase={goToNextPhase} // 使用通用函式
+            />
+          );
+  
+        case 'investigation2':
+          return <InvestigationPhase
+            roomId={roomId}
+            isHost={isHost}
+            roomCode={roomCode}
+            playerId={playerId}
+            currentPhase={currentPhase}
+            setCurrentPhase={goToNextPhase} // 使用通用函式
+           />;
+  
+        case 'discussion2':
+          return <DiscussionPhase 
+          isHost={isHost}
+          roomId={roomId}
+          currentPhase={currentPhase}
+          setCurrentPhase={goToNextPhase} // 使用通用函式
+          />;
 
       case 'voting':
         return (
@@ -201,7 +240,8 @@ export default function GameContent({
         );
 
       case 'ended':
-        return <EndedPhase />;
+        return <EndedPhase
+        roomId={roomId} />;
 
       default:
         return <DefaultPhase />;
