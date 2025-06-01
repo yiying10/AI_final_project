@@ -39,7 +39,6 @@ export default function ChatRoom({ roomId, playerId, players, setPlayers }: Chat
         .from('message')
         .select('*')
         .eq('room_id', roomId)
-        .order('created_at', { ascending: true });
 
       if (error) {
         console.error('讀取訊息失敗:', error);

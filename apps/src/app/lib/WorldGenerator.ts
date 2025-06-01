@@ -71,7 +71,7 @@ export async function generateWorld(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         background: background,
-        num_characters: options?.num_characters || 4,
+        num_characters: 4,
         num_npcs: options?.num_npcs || 3,
         num_acts: options?.num_acts || 2,
         model: options?.model || 'gemini-2.0-flash',
@@ -120,7 +120,6 @@ export async function generateWorldAndSave(
       .insert({
         room_id: roomId,
         prompt: prompt,
-        title: '', // 可選：自動產生標題
         background: background,
         answer: worldData.ending,
       })
@@ -155,7 +154,6 @@ export async function generateWorldAndSave(
     const maps = worldData.locations.map((loc) => ({
       script_id: scriptId,
       name: loc.name,
-      content: '', // 可填補充描述
     }));
     const { data: mapInserts, error: mapError } = await supabase.from('gamemap').insert(maps).select();
     if (mapError) throw new Error('儲存 GameMap 失敗: ' + mapError.message);
