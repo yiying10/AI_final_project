@@ -295,7 +295,7 @@ async def call_llm_for_scenes_and_ending(
     temperature: float = 0.7,
     max_tokens: int = 3000,
 ) -> Tuple[List[Dict[str, Any]], str]:
-    # 1️⃣ 强调纯 JSON 输出的 system prompt
+    # 强调纯 JSON 输出的 system prompt
     names = [ch["name"] for ch in characters]
     names_str = "、".join(names)
     system = (
@@ -319,13 +319,13 @@ async def call_llm_for_scenes_and_ending(
         5. 漸進揭露：
         - 幕與幕之間要有連貫性：第一幕揭開事件冰山一角，第二幕拼湊部分真相，第三幕提供最後兇手線索。
         6. 每幕腳本長度：
-        -“dialogue” 中 **禁止** 出现“我是李明”之類的自我介紹句子；請直接以角色的語氣進入對話。
+        -“dialogue” 中 **禁止** 出現“我是李明”之類的自我介紹句子；請直接以角色的語氣進入對話。
         - 每個角色在每幕的專屬劇本 100–200 字，保證足夠細節。
         7. 嵌入謎題：
         - 部分線索請以「謎題」形式出現（例如：『密碼是屋頂牌匾上的三個字母』），讓玩家必須解題才能進入下一步。
         """
     )
-    # 2️⃣ user prompt 描述任务
+    #  user prompt 描述任务
     user = (
         f"故事背景：{background}\n"
         f"角色清單（必須依此順序輸出）：{json.dumps([c['name'] for c in characters], ensure_ascii=False)}\n"
@@ -334,7 +334,7 @@ async def call_llm_for_scenes_and_ending(
         "最後再給一個 ending (字串)。"
     )
 
-    # 3️⃣ 定义 JSON schema
+    #  定義 JSON schema
     schema = {
         "type": "object",
         "properties": {
@@ -373,7 +373,7 @@ async def call_llm_for_scenes_and_ending(
         max_output_tokens=max_tokens
     )
 
-    # 4️⃣ 同步调用 Gemini
+    #  同步调用 Gemini
     def _sync_call():
         return client.models.generate_content(
             model=model,
