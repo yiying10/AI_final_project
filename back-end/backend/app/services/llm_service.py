@@ -74,7 +74,7 @@ async def call_llm_for_characters(
         """每一位角色產生一段 `public_info`，並且：
         1. **語氣**：全部使用第二人稱「你是…」開頭，例如「你是一位…」，帶入角色身份。  
         2. **內容**：包含角色的背景（身份或出身）、主要性格特質、當前動機，約 1–2 句話。 """
-        "name：請**只能**填寫人物的「個人姓名」，**不要**加上任何職位、頭銜或敬稱（例如「陳院長」、「王護士長」都不行，只能寫「陳」、「王」或「陳先生」、「王女士」）。"
+        "name：請**只能**填寫人物的「個人姓名」，**不要**加上任何職位、頭銜或敬稱（例如「陳院長」、「王護士長」都不行)，要是一個完整姓名。"
     )
     user = f"故事背景：{background}\n請生成 {num_characters} 位角色。"
 
@@ -256,7 +256,7 @@ async def call_llm_for_npcs(
         "你是一名劇本殺編劇，根據以下故事背景生成指定數量的 NPC 角色。"
         "請以純 JSON 陣列回傳，每個元素包含 name, description 兩個欄位。"
         "所有輸出只能用繁體中文"
-        "name：請**只能**填寫人物的「個人姓名」，**不要**加上任何職位、頭銜或敬稱（例如「陳院長」、「王護士長」都不行，只能寫「陳」、「王」或「陳先生」、「王女士」）。"
+        "name：請**只能**填寫人物的「個人姓名」，**不要**加上任何職位、頭銜或敬稱（例如「陳院長」、「王護士長」都不行），必須要是完整姓名。"
         f"NPC角色不可以和已生成的{characters}有重複"
     )
     user = f"故事背景：{background}\\n請生成 {num_npcs} 位 NPC。"
@@ -295,7 +295,7 @@ async def call_llm_for_scenes_and_ending(
     temperature: float = 0.7,
     max_tokens: int = 3000,
 ) -> Tuple[List[Dict[str, Any]], str]:
-    # 1️⃣ 强调纯 JSON 输出的 system prompt
+    # 强调纯 JSON 输出的 system prompt
     names = [ch["name"] for ch in characters]
     names_str = "、".join(names)
     system = (
@@ -319,13 +319,13 @@ async def call_llm_for_scenes_and_ending(
         5. 漸進揭露：
         - 幕與幕之間要有連貫性：第一幕揭開事件冰山一角，第二幕拼湊部分真相，第三幕提供最後兇手線索。
         6. 每幕腳本長度：
-        -“dialogue” 中 **禁止** 出现“我是李明”之類的自我介紹句子；請直接以角色的語氣進入對話。
+        -“dialogue” 中 **禁止** 出現“我是李明”之類的自我介紹句子；請直接以角色的語氣進入對話。
         - 每個角色在每幕的專屬劇本 100–200 字，保證足夠細節。
         7. 嵌入謎題：
         - 部分線索請以「謎題」形式出現（例如：『密碼是屋頂牌匾上的三個字母』），讓玩家必須解題才能進入下一步。
         """
     )
-    # 2️⃣ user prompt 描述任务
+    #  user prompt 描述任务
     user = (
         f"故事背景：{background}\n"
         f"角色清單（必須依此順序輸出）：{json.dumps([c['name'] for c in characters], ensure_ascii=False)}\n"
@@ -334,7 +334,7 @@ async def call_llm_for_scenes_and_ending(
         "最後再給一個 ending (字串)。"
     )
 
-    # 3️⃣ 定义 JSON schema
+    #  定義 JSON schema
     schema = {
         "type": "object",
         "properties": {
@@ -373,7 +373,7 @@ async def call_llm_for_scenes_and_ending(
         max_output_tokens=max_tokens
     )
 
-    # 4️⃣ 同步调用 Gemini
+    #  同步调用 Gemini
     def _sync_call():
         return client.models.generate_content(
             model=model,
@@ -421,7 +421,7 @@ async def call_llm_for_locations(
         " 1) id (整數，地點識別，從 1 開始)、"
         " 2) name (地點名稱)、"
         " 3) npcs (整數陣列，對應 NPC 的 id)、"
-        " 4) objects (物件陣列，每個物件要有 id, name, lock(int), clue(string或null), owner_id(integer, 預設為null))。"
+        " 4) objects (物件陣列，每個物件要有 id, name, lock(int), clue(string，一定要有), owner_id(integer, 預設為null))。"
         "務必只回傳純 JSON 陣列，不要多任何說明文字。"
         "只能用繁體中文"
     )
