@@ -22,10 +22,10 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
   setCurrentPhase,
 }) => {
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
-  const [selectedDetail, setSelectedDetail] = useState<{ type: 'object' | 'npc'; name: string; content?: string | null; ref?: string | null } | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<{ type: 'object' | 'npc'; name: string; content?: string | null; info?: string | null } | null>(null);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [objects, setObjects] = useState<{ id: string; map_id: string; name: string; content: string | null }[]>([]);
-  const [npcs, setNpcs] = useState<{ id: string; map_id: string; name: string; ref: string | null }[]>([]);
+  const [npcs, setNpcs] = useState<{ id: string; map_id: string; name: string; info: string | null }[]>([]);
   const [chatDialogues, setChatDialogues] = useState<{ [npcId: string]: string }>({});
   const [inputText, setInputText] = useState<string>('');
 
@@ -33,7 +33,7 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
     roomId,
     phase: currentPhase,
     isHost,
-    duration: 90, //TODO: 210秒
+    duration: 300, //TODO: 210秒
     onTimerEnd: () => setCurrentPhase(), // 房主結束時切換
   });
 
@@ -49,7 +49,7 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
 
       const { data: locs } = await supabase.from('gamemap').select('id, name').eq('script_id', scriptId);
       const { data: objs } = await supabase.from('gameobject').select('id, map_id, name, content').eq('script_id', scriptId);
-      const { data: npcs } = await supabase.from('gamenpc').select('id, map_id, name, ref').eq('script_id', scriptId);
+      const { data: npcs } = await supabase.from('gamenpc').select('id, map_id, name, info').eq('script_id', scriptId);
 
       setLocations(locs || []);
       setObjects(objs || []);
@@ -136,7 +136,7 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
         background: scriptData?.background || '這是一個推理遊戲',
         npc_info: {
           name: npc.name,
-          description: npc.ref || '一個神秘的角色'
+          description: npc.info || '一個神秘的角色'
         },
         player_info: playerInfo,
         chat_history: []
@@ -161,10 +161,10 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
     }
   };
   
-  const handleNPCClick = (npc: { id: string; name: string; ref: string | null }) => {
+  const handleNPCClick = (npc: { id: string; name: string; info: string | null }) => {
     const confirmTalk = window.confirm(`是否要與 ${npc.name} 對話？`);
     if (confirmTalk) {
-      setSelectedDetail({ type: 'npc', name: npc.name, ref: npc.ref });
+      setSelectedDetail({ type: 'npc', name: npc.name, info: npc.info });
     }
   };
 
@@ -232,7 +232,7 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
           {selectedDetail.type === 'object' && <h4 className="text-xl font-bold text-indigo-700">{selectedDetail.name} 的內容</h4>}
           {selectedDetail.type === 'object' && 
           <p className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-gray-800">
-            {selectedDetail.type === 'object' ? selectedDetail.content || '無更多資訊' : selectedDetail.ref || '這是 NPC，你可以開始互動！'}
+            {selectedDetail.type === 'object' ? selectedDetail.content || '無更多資訊' : selectedDetail.info || '這是 NPC，你可以開始互動！'}
           </p>
           }
           {selectedDetail.type === 'npc' && (
@@ -240,7 +240,7 @@ const InvestigationPhase: React.FC<InvestigationPhaseProps> = ({
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
                 <h4 className="text-lg font-bold text-indigo-700">{selectedDetail.name}</h4>
                 <p className="text-gray-800">
-                  {chatDialogues[npcs.find((n) => n.name === selectedDetail.name)?.id || ''] || '這是 NPC，你可以開始互動！'}
+                  {chatDialogues[npcs.find((n) => n.name === selectedDetail.name)?.id || ''] || npcs.find((n) => n.name === selectedDetail.name)?.info}
                 </p>
 
               </div>

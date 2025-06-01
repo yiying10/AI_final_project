@@ -21,7 +21,7 @@ export default function DiscussionPhase({
     roomId,
     phase: currentPhase,
     isHost,
-    duration: 10, //TODO: 300 
+    duration: 300, //TODO: 300 
     onTimerEnd: () => setCurrentPhase(), // 房主結束時切換
   });
 

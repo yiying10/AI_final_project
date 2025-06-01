@@ -226,6 +226,7 @@ export default function HomePage() {
 
       if (playerCount && playerCount >= MAX_PLAYER) {
         toast.error('房間已滿');
+        alert("此房間已滿，請選擇其他房間");
         return;
       }
 
@@ -321,8 +322,20 @@ export default function HomePage() {
             {joining ? '加入中...' : '加入房間'}
           </button>
         </div>
+        <div className="space-y-4 text-gray-700 text-sm mt-6 border-t pt-4 border-gray-300">
+        <h2 className="text-lg font-semibold text-indigo-700">劇本殺介紹</h2>
+        <p>劇本殺是一種多人角色扮演推理遊戲，玩家各自扮演劇本中的角色，根據劇情線索進行推理、互動，最終找出真相或完成各自的目標任務。</p>
+        <p>遊戲流程包含以下階段：</p>
+        <ul className="list-disc list-inside pl-4 space-y-1">
+          <li><strong>角色分配：</strong>每位玩家獲得角色身份與背景故事。</li>
+          <li><strong>劇情閱讀：</strong>了解故事背景、任務目標、人物關係。</li>
+          <li><strong>互動環節：</strong>進行角色扮演、提出問題、尋找線索。</li>
+          <li><strong>推理階段：</strong>根據所有線索推理案件真相。</li>
+          <li><strong>結局揭曉：</strong>公開真相，結束遊戲，根據表現評分。</li>
+        </ul>
+        <p className="mt-2">現在就來體驗 AI 劇本殺吧！創建房間或加入房間，開始你的冒險之旅！</p>
+      </div>
       </div>
     </main>
-
   );
 }

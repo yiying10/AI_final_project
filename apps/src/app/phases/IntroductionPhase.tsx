@@ -123,13 +123,24 @@ export default function IntroductionPhase({ roomId, playerId, roomCode, isHost, 
     setGeneratingWorld(true);
     try {
       console.log('發送 generateWorld 請求...');
+      const { data: playersData, error: playersError } = await supabase
+      .from('player')
+      .select('id', { count: 'exact' })
+      .eq('room_id', roomId);
+
+      if (playersError) {
+        console.error('獲取玩家人數失敗：', playersError);
+        throw new Error('獲取玩家人數失敗');
+      }
+      const playerCount = playersData.length;
+      
       const worldData = await generateWorldAndSave(
         roomId,
         roomCode,
         prompt,
         storySummary,
         {
-          num_characters: 4,
+          num_characters: playerCount || 4,
           num_npcs: 3,
           num_acts: 2,
         }

@@ -14,6 +14,7 @@ export interface Npc {
   id: number;
   name: string;
   description: string;
+  info: string;
 }
 
 export interface Dialogue {
@@ -162,12 +163,15 @@ export async function generateWorldAndSave(
     const mapIdLookup = new Map(mapInserts.map((m) => [m.name, m.id]));
     
     const npcs = worldData.locations.flatMap((loc) =>
-      loc.npcs.map((npcId) => ({
-        script_id: scriptId,
-        map_id: mapIdLookup.get(loc.name),
-        name: worldData.npcs.find((n) => n.id === npcId)?.name || '',
-        ref: npcId.toString(), // 或留空 ''
-      }))
+      loc.npcs.map((npcId) => {
+        const npcData = worldData.npcs.find((n) => n.id === npcId);
+        return {
+          script_id: scriptId,
+          map_id: mapIdLookup.get(loc.name),
+          name: npcData?.name || '',
+          info: npcData?.description || ''
+        };
+      })
     );
     await supabase.from('gamenpc').insert(npcs);
 

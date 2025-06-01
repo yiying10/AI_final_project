@@ -95,7 +95,7 @@ const DialoguePhase = ({ roomId, playerId, isHost, setCurrentPhase, currentPhase
     <div className="p-6 bg-white rounded-2xl shadow-lg border border-gray-200 space-y-4">
   <div>
     <h2 className="text-2xl font-bold text-indigo-700 mb-2">角色劇本閱讀</h2>
-    {(currentPhase === 'dialogue1') && <p className="text-gray-700">請先仔細閱讀自己的角色資訊，並在所有人準備好後，輪流進行自我介紹。房主負責點擊「下一步」進入下一階段。</p>}
+    {(currentPhase === 'dialogue1') && <p className="text-gray-700">請先仔細閱讀自己的角色資訊，並在所有人準備好後，輪流進行自我介紹。房主負責點擊按鈕進入下一階段。</p>}
     {(currentPhase === 'dialogue2') && <p className="text-gray-700">請閱讀自己的第二段角色資訊，在所有人準備好後由房主負責確認進入下一階段。</p>}
   </div>
 
