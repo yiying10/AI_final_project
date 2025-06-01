@@ -391,7 +391,7 @@ export default function RoomPage() {
           <h3 className="text-lg font-semibold text-indigo-700">房主控制面板</h3>
           <button
             onClick={handleStartGame}
-            disabled={players.length < 1} //TODO
+            disabled={players.length < 4} //TODO
             className="w-full py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
           >
             開始遊戲
