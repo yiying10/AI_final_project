@@ -104,4 +104,7 @@ apps/
 ```
 
 ## 📚 References
-//待補充
+- Liu, P., Yuan, W., Fu, J., et al. (2023). Pre-train, prompt, and predict: A systematic survey of prompting methods in natural language processing. ACM Computing Surveys, 55(9), 1-35.
+- Yang, K., Klein, D., Peng, N., & Yao, Y. (2022). DOC: Improving long story coherence with detailed outline control. Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics, 4378-4392.
+- Porteous, J., & Cavazza, M. (2009). Controlling narrative generation with planning trajectories: The role of constraints. Interactive Storytelling, 234-245.)
+- https://ithelp.ithome.com.tw/m/articles/10349538
