@@ -63,7 +63,11 @@ npm run dev
 
 
 ## 🧪 Experiment Results
-待補充
+- **Experiment 1**:Impact of Temperature on Generated Text:
+  - Optimal temperature 0.7 : delivers the best balance between topical relevance and both the integrity and diversity of sentence structures
+- **Experiment 2**:Prompt-Design Effects on LLM Task Success:
+  -  Rule-oriented > Creative-oriented : the model complies far more reliably with explicit, formal constraints than with open-ended creative requests
+  - Example-driven > Abstract description : supplying concrete sample outputs markedly improves format consistency and task-completion rates, whereas abstract guidelines alone rarely achieve the desired results
 
 ---
 
