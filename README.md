@@ -110,7 +110,7 @@ apps/
 ## 📄 Additional Documentation
 
 ### Tree Rendering Analysis
-This repository also includes a comprehensive technical analysis of 3D tree rendering from another Computer Graphics project:
+This repository also includes a comprehensive technical analysis of 3D tree rendering from another Computer Graphics project. These documents are suitable for computer graphics students, OpenGL developers, and anyone interested in real-time 3D rendering techniques.
 
 - **[樹木渲染分析 (中文)](TREE_RENDERING_ANALYSIS.md)** - Detailed analysis of tree rendering techniques in CG-FinalProject, including OpenGL implementation, shader programming, and rendering pipeline optimization
 - **[Tree Rendering Analysis (English)](TREE_RENDERING_ANALYSIS_EN.md)** - English version of the tree rendering technical documentation
@@ -121,6 +121,8 @@ These documents provide in-depth explanations of:
 - OpenGL buffer management and VAO/VBO usage
 - Vertex and fragment shader implementation
 - Texture mapping and coordinate system handling
+
+**Target Audience**: Intermediate to advanced developers with basic knowledge of OpenGL and 3D graphics concepts.
 
 ---
 

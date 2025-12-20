@@ -17,9 +17,9 @@ In the CG-FinalProject, trees are not rendered as separate model files. Instead,
 
 **Objects in sky.obj:**
 ```
-o 天体.001    # Celestial body (moon)
-o 高.001      # Tall object (likely tree)
-o 高.002      # Tall object (likely tree)
+o 天体.001    # "Tianti" - Celestial body (moon)
+o 高.001      # "Gao" - Tall object (likely tree, "gao" means "tall" in Chinese)
+o 高.002      # "Gao" - Tall object (likely tree)
 ```
 
 **Materials Used:**
@@ -33,7 +33,7 @@ o 高.002      # Tall object (likely tree)
 **Tree-Related Textures:**
 ```
 - Area_Ly_Tree_Common_Pt_Bark_01_Diffuse.png  # Tree bark
-- Stages_Unique_CyTree01_Brak01_Diffuse.png   # Cherry tree bark
+- Stages_Unique_CyTree01_Bark01_Diffuse.png   # Cherry tree bark
 - leaf01.png, leaf02.png, leaves.png          # Leaves
 - tree.png                                     # Tree texture
 - sakura.png, sakura_leaves.png               # Cherry blossom
@@ -303,7 +303,7 @@ The project has a more complex `ObjLoader` class (for shrine rendering):
 | Purpose | Background elements | Main scene objects |
 | Complexity | Simple | Complex |
 
-The Sky class is simplified because trees serve as background elements and don't need complex lighting.
+**Why the simplification?** The Sky class is simplified because trees serve as background elements in the fireworks scene. Complex lighting calculations would be unnecessary and wasteful for distant background objects. This design decision prioritizes performance while maintaining visual quality for elements that don't require detailed lighting.
 
 ## Potential Improvements
 

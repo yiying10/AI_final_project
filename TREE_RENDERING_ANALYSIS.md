@@ -40,7 +40,7 @@ sky.obj 使用了三種材質：
 專案中包含多個與樹木相關的紋理檔案：
 ```
 - Area_Ly_Tree_Common_Pt_Bark_01_Diffuse.png  # 樹皮紋理
-- Stages_Unique_CyTree01_Brak01_Diffuse.png   # 櫻花樹樹皮
+- Stages_Unique_CyTree01_Bark01_Diffuse.png   # 櫻花樹樹皮
 - leaf01.png                                    # 樹葉 1
 - leaf02.png                                    # 樹葉 2
 - leaves.png                                    # 樹葉
