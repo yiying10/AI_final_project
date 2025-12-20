@@ -98,7 +98,7 @@ struct SkyRenderMetaData {
    - 3 position coordinates (x, y, z)
    - 2 texture coordinates (u, v)
    
-   **Important**: Texture Y-coordinate is flipped (`1.0f - texcoord`) to handle OpenGL vs Blender coordinate system difference.
+   **Important**: Texture Y-coordinate is flipped (`1.0f - texcoord`) to handle OpenGL vs Blender coordinate system difference. This difference stems from different design philosophies: OpenGL follows mathematical convention (Cartesian coordinate system with origin at bottom-left), while 3D modeling software like Blender typically uses image processing convention (origin at top-left, similar to screen coordinates). Without this flip, textures would appear upside-down in the rendered scene.
 
 4. **Create Batch Rendering List** - Group consecutive vertices with same texture:
    ```cpp

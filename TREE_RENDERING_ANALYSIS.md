@@ -164,7 +164,7 @@ for (const auto &shape : shapes) {
 }
 ```
 
-**關鍵點**: 紋理座標的 Y 軸需要翻轉 (`1.0f - texcoord`)，因為 OpenGL 的原點在左下角，而 Blender 的原點在左上角。
+**關鍵點**: 紋理座標的 Y 軸需要翻轉 (`1.0f - texcoord`)，因為 OpenGL 的原點在左下角，而 Blender 的原點在左上角。這個差異源於不同的設計哲學：OpenGL 遵循數學慣例（笛卡爾座標系），而 Blender 等 3D 建模軟體通常使用圖像處理慣例（原點在左上角）。
 
 4. **建立批次渲染列表**
 
