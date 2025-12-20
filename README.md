@@ -107,6 +107,23 @@ apps/
         ├── .env                                 # 環境變數設定
 ```
 
+## 📄 Additional Documentation
+
+### Tree Rendering Analysis
+This repository also includes a comprehensive technical analysis of 3D tree rendering from another Computer Graphics project:
+
+- **[樹木渲染分析 (中文)](TREE_RENDERING_ANALYSIS.md)** - Detailed analysis of tree rendering techniques in CG-FinalProject, including OpenGL implementation, shader programming, and rendering pipeline optimization
+- **[Tree Rendering Analysis (English)](TREE_RENDERING_ANALYSIS_EN.md)** - English version of the tree rendering technical documentation
+
+These documents provide in-depth explanations of:
+- OBJ file structure and material systems
+- Batch rendering optimization techniques
+- OpenGL buffer management and VAO/VBO usage
+- Vertex and fragment shader implementation
+- Texture mapping and coordinate system handling
+
+---
+
 ## 📚 References
 - Liu, P., Yuan, W., Fu, J., et al. (2023). Pre-train, prompt, and predict: A systematic survey of prompting methods in natural language processing. ACM Computing Surveys, 55(9), 1-35.
 - Yang, K., Klein, D., Peng, N., & Yao, Y. (2022). DOC: Improving long story coherence with detailed outline control. Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics, 4378-4392.
